@@ -91,6 +91,7 @@ export function JobApplicationForm({ onSubmit, loading = false }: JobApplication
 
   const [currentSkill, setCurrentSkill] = useState('');
   const [currentLanguage, setCurrentLanguage] = useState('');
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
 
   const handleInputChange = (field: keyof JobApplicationData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -230,6 +231,14 @@ export function JobApplicationForm({ onSubmit, loading = false }: JobApplication
     const file = e.target.files?.[0];
     if (file) {
       setFormData(prev => ({ ...prev, resumeFile: file }));
+      // Show a short success message for PDF uploads (or general uploads)
+      if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+        setUploadMessage('PDF uploaded successfully');
+      } else {
+        setUploadMessage('Resume uploaded successfully');
+      }
+      // Clear message after 4 seconds
+      setTimeout(() => setUploadMessage(null), 4000);
     }
   };
 
@@ -346,6 +355,9 @@ export function JobApplicationForm({ onSubmit, loading = false }: JobApplication
                 onChange={handleResumeUpload}
                 className="flex-1"
               />
+              {uploadMessage && (
+                <div className="text-sm text-green-600">{uploadMessage}</div>
+              )}
               {formData.resumeFile && (
                 <Badge variant="secondary" className="flex items-center gap-2">
                   <FileText className="h-3 w-3" />

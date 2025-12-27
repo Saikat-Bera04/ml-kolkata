@@ -130,9 +130,8 @@ export default function StudentJobs() {
       if (data.resumeText) {
         resumeText = data.resumeText;
       } else if (data.resumeFile) {
-        // Extract text from resume file
-        const { extractResumeText } = await import('@/services/googleVision');
-        resumeText = await extractResumeText(data.resumeFile);
+        // OCR has been removed: accept the uploaded file and proceed without extracting text
+        resumeText = '';
       } else {
         // Build resume text from form data
         resumeText = `

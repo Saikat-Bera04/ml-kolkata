@@ -1,0 +1,4 @@
+# Vision proxy has been removed. If you need to restore it, add the
+# required dependencies here (fastapi, uvicorn, pdf2image, Pillow, httpx)
+# and then implement the service again.
+typing-extensions==4.7.1

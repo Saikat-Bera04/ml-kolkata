@@ -1,7 +1,6 @@
 // Resume Analysis Service using Gemini API for job recommendations
 
 import { generateGeminiText } from './gemini';
-import { extractResumeText } from './googleVision';
 import { searchJobs, type JobResult } from './jobSearch';
 
 export interface ResumeData {
@@ -241,13 +240,22 @@ export async function analyzeResumeAndGetJobs(
   resumeText: string,
   userLocation?: string
 ): Promise<ResumeAnalysisResult> {
-  let finalResumeText = resumeText;
-  
-  // Extract text from file if provided
-  if (resumeFile && !resumeText) {
-    finalResumeText = await extractResumeText(resumeFile);
-  }
-  
+  const finalResumeText = resumeText || '';
+
+    // OCR / PDF text extraction has been removed. If the user uploaded a file but didn't paste text,
+    // we treat the upload as successful but do not attempt to extract text. Return a lightweight
+    // success response informing the user that the PDF was uploaded successfully.
+    if (!finalResumeText.trim() && resumeFile) {
+      return {
+        resumeData: {} as ResumeData,
+        summary: 'Resume uploaded successfully. Text extraction is disabled.',
+        strengths: [],
+        improvements: [],
+        suggestions: ['Resume uploaded successfully. To analyze the resume, paste the resume text into the form.'],
+        jobRecommendations: [],
+      };
+    }
+
   if (!finalResumeText.trim()) {
     throw new Error('Please provide resume text or upload a resume file');
   }
