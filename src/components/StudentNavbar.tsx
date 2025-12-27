@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
-import { getUnreadCount, getNotifications, markAsRead, markAllAsRead } from '@/services/notifications';
+import { getUnreadCount, getNotifications, markAsRead, markAllAsRead, Notification } from '@/services/notifications';
 import { SupportModal } from '@/components/SupportModal';
 import {
   DropdownMenu,
@@ -17,7 +17,7 @@ export function StudentNavbar() {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
 
@@ -25,29 +25,32 @@ export function StudentNavbar() {
     { label: 'Dashboard', path: '/student/dashboard' },
     { label: 'About', path: '/student/about' },
     { label: 'Podcasts', path: '/student/podcasts' },
-    { label: 'Jobs', path: '/student/jobs' },
+    // Jobs will be a dropdown with quick links
     { label: 'Timetable', path: '/student/timetable' },
   ];
 
+  // loadNotifications stable via useCallback-like definition inside effect
   useEffect(() => {
-    if (user) {
-      loadNotifications();
-      
-      // Listen for notification updates
-      const handleNotificationUpdate = () => {
-        loadNotifications();
-      };
-      
-      window.addEventListener('notification-created', handleNotificationUpdate);
-      window.addEventListener('notification-updated', handleNotificationUpdate);
-      window.addEventListener('refresh-notifications', handleNotificationUpdate);
-      
-      return () => {
-        window.removeEventListener('notification-created', handleNotificationUpdate);
-        window.removeEventListener('notification-updated', handleNotificationUpdate);
-        window.removeEventListener('refresh-notifications', handleNotificationUpdate);
-      };
-    }
+    if (!user) return;
+
+    const handleNotificationUpdate = () => {
+      const allNotifications = getNotifications(user.id);
+      setNotifications(allNotifications);
+      setUnreadCount(getUnreadCount(user.id));
+    };
+
+    // Initial load
+    handleNotificationUpdate();
+
+    window.addEventListener('notification-created', handleNotificationUpdate as EventListener);
+    window.addEventListener('notification-updated', handleNotificationUpdate as EventListener);
+    window.addEventListener('refresh-notifications', handleNotificationUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('notification-created', handleNotificationUpdate as EventListener);
+      window.removeEventListener('notification-updated', handleNotificationUpdate as EventListener);
+      window.removeEventListener('refresh-notifications', handleNotificationUpdate as EventListener);
+    };
   }, [user]);
 
   const loadNotifications = () => {
@@ -57,11 +60,13 @@ export function StudentNavbar() {
     setUnreadCount(getUnreadCount(user.id));
   };
 
-  const handleNotificationClick = (notification: any) => {
+  const handleNotificationClick = (notification: Notification) => {
     if (!user) return;
-    if (!notification.read) {
+    if (!notification.read && notification.id) {
       markAsRead(user.id, notification.id);
-      loadNotifications();
+      // Update local state
+      setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, read: true } : n));
+      setUnreadCount(getUnreadCount(user.id));
     }
   };
 
@@ -114,6 +119,27 @@ export function StudentNavbar() {
                 {item.label}
               </button>
             ))}
+
+            {/* Jobs Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="text-sm font-medium hover:text-primary-foreground/80 transition-colors flex items-center gap-1">
+                  Jobs
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => navigate('/student/jobs#search')}>
+                  Search Jobs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/student/jobs#saved')}>
+                  Saved Jobs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/student/jobs#resume')}>
+                  Resume Analysis
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Right: Notifications, Support, Profile */}

@@ -269,31 +269,19 @@ export default function StudentLearning() {
         <Card>
           <CardContent className="py-12 text-center">
             <Play className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground mb-2 font-medium">
+            <p className="text-muted-foreground mb-2">
               No videos found for this subject.
             </p>
-            <div className="text-xs text-muted-foreground space-y-1 mb-4">
-              <p>Possible reasons:</p>
-              <ul className="list-disc list-inside text-left max-w-md mx-auto space-y-1">
-                <li>YouTube API quota exceeded (daily limit reached)</li>
-                <li>No cached videos available</li>
-                <li>Network or API key issues</li>
-              </ul>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <Button
-                variant="outline"
-                onClick={() => selectedSubject && handleSubjectSelect(selectedSubject)}
-              >
-                Retry
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(`${selectedSubject?.name} tutorial lecture`), '_blank')}
-              >
-                Search on YouTube
-              </Button>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Please check your YouTube API key or try again later.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => selectedSubject && handleSubjectSelect(selectedSubject)}
+            >
+              Retry
+            </Button>
           </CardContent>
         </Card>
       ) : (

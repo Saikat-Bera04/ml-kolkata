@@ -4,10 +4,21 @@
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
 const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
 
-// Quota tracking
-let quotaExceeded = false;
-const QUOTA_RESET_TIME = 24 * 60 * 60 * 1000; // 24 hours
-
+// Parse YouTube error response safely
+function parseYouTubeError(body: unknown): { reason?: string; message?: string } {
+  try {
+    if (!body || typeof body !== 'object') return {};
+    const b = body as Record<string, unknown>;
+    const err = (b.error as Record<string, unknown> | undefined) ?? undefined;
+    const errors = err ? (err.errors as Array<Record<string, unknown>> | undefined) : undefined;
+    const reason = errors && errors[0] && typeof errors[0].reason === 'string' ? (errors[0].reason as string) : undefined;
+    const message = err && typeof err.message === 'string' ? (err.message as string) : undefined;
+    return { reason, message };
+  } catch {
+    return {};
+  }
+}
+      let errBody: unknown;
 // Cache configuration
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const CACHE_KEY_PREFIX = 'youtube_videos_cache_';
@@ -103,82 +114,6 @@ function clearOldCacheEntries(): void {
   }
 }
 
-/**
- * Fallback: Search YouTube using RSS feed (no quota required)
- * This is a workaround when API quota is exceeded
- * Note: YouTube RSS feeds are limited, so this may not always work
- */
-async function searchYouTubeViaRSS(query: string, maxResults: number = 10): Promise<YouTubeVideo[]> {
-  try {
-    // Method 1: Try RSS2JSON service (free tier available)
-    const searchUrl = `https://www.youtube.com/feeds/videos.xml?search_query=${encodeURIComponent(query)}`;
-    
-    // Try without API key first (RSS2JSON has free tier)
-    let response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(searchUrl)}&count=${maxResults}`);
-    
-    // If that fails and we have an API key, try with it
-    if (!response.ok && YOUTUBE_API_KEY) {
-      response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(searchUrl)}&api_key=${YOUTUBE_API_KEY}&count=${maxResults}`);
-    }
-    
-    if (!response.ok) {
-      console.warn('RSS fallback failed. YouTube API quota exceeded and RSS unavailable.');
-      return [];
-    }
-
-    const data = await response.json();
-    
-    if (!data.items || data.items.length === 0) {
-      return [];
-    }
-
-    // Convert RSS format to YouTubeVideo format
-    const videos: YouTubeVideo[] = data.items.map((item: any) => {
-      // Extract video ID from link
-      const videoIdMatch = item.link?.match(/[?&]v=([^&]+)/);
-      const videoId = videoIdMatch ? videoIdMatch[1] : null;
-      
-      if (!videoId) return null;
-
-      // Get thumbnail from YouTube (no API needed)
-      const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
-
-      return {
-        id: { videoId },
-        snippet: {
-          title: item.title || '',
-          description: item.description || item.content || '',
-          channelTitle: item.author || 'Unknown Channel',
-          thumbnails: {
-            medium: { url: item.thumbnail || thumbnailUrl },
-            high: { url: item.thumbnail || thumbnailUrl },
-          },
-        },
-      };
-    }).filter((v: any) => v !== null);
-
-    console.log(`RSS fallback found ${videos.length} videos for: ${query}`);
-    return videos;
-  } catch (error) {
-    console.error('RSS fallback error:', error);
-    return [];
-  }
-}
-
-/**
- * Check if YouTube API quota is exceeded
- */
-export function isQuotaExceeded(): boolean {
-  return quotaExceeded;
-}
-
-/**
- * Reset quota exceeded flag (call when quota resets)
- */
-export function resetQuotaStatus(): void {
-  quotaExceeded = false;
-}
-
 export interface YouTubeVideo {
   id: {
     videoId: string;
@@ -242,8 +177,8 @@ export async function searchYouTubeVideos(
     const response = await fetch(url.toString());
     
     if (!response.ok) {
-      // Try to parse JSON error from YouTube to get more details
-      let errBody: any;
+  // Try to parse JSON error from YouTube to get more details
+  let errBody: unknown;
       try {
         errBody = await response.json();
       } catch (e) {
@@ -261,36 +196,26 @@ export async function searchYouTubeVideos(
         throw new Error(`YouTube API error: ${response.status} - ${text}`);
       }
 
-      // If quota exceeded, try to return cached data
-      const reason = errBody?.error?.errors?.[0]?.reason;
-      const message = errBody?.error?.message || JSON.stringify(errBody);
+      const parsed = parseYouTubeError(errBody);
+      const reason = parsed.reason;
+      const message = parsed.message || JSON.stringify(errBody);
       console.error('YouTube API error:', response.status, reason || message);
 
       if (reason === 'quotaExceeded') {
-        quotaExceeded = true;
-        console.warn('YouTube API quota exceeded. Attempting fallback methods...');
+        console.warn('YouTube API quota exceeded. Attempting to use cached data...');
         
-        // Try cached data first (even expired)
+        // Try to get any cached data (even expired)
         const expiredCache = getCachedVideos(searchQuery, maxResults, true);
         if (expiredCache && expiredCache.length > 0) {
           console.log('Returning cached videos due to quota exceeded');
           return expiredCache;
         }
         
-        // Try RSS fallback (no quota required)
-        console.log('Attempting RSS feed fallback...');
-        const rssVideos = await searchYouTubeViaRSS(searchQuery, maxResults);
-        if (rssVideos.length > 0) {
-          setCachedVideos(searchQuery, maxResults, rssVideos);
-          return rssVideos;
-        }
-        
-        // No fallback available
-        console.error('No videos available. YouTube API quota exceeded and no fallback data found.');
+        // No cache available, return empty with helpful message
+        console.error('No cached videos available. YouTube API quota exceeded.');
         return [];
       }
 
-      // For other errors, try expired cache
       const expiredCache = getCachedVideos(searchQuery, maxResults, true);
       if (expiredCache) {
         console.warn('Using expired cache due to API error');
@@ -428,7 +353,7 @@ export async function searchVideosForTopic(
     const response = await fetch(url.toString());
     
     if (!response.ok) {
-      let errBody: any;
+      let errBody: unknown;
       try {
         errBody = await response.json();
       } catch (e) {
@@ -443,34 +368,24 @@ export async function searchVideosForTopic(
         return [];
       }
 
-      const reason = errBody?.error?.errors?.[0]?.reason;
-      
+      const parsed = parseYouTubeError(errBody);
+      const reason = parsed.reason;
+
       if (reason === 'quotaExceeded') {
-        quotaExceeded = true;
-        console.warn('YouTube API quota exceeded. Attempting fallback methods...');
-        
-        // Try cached data first
+        console.warn('YouTube API quota exceeded. Using cached data if available...');
         const expiredCache = getCachedVideos(searchQuery, maxResults, true);
         if (expiredCache && expiredCache.length > 0) {
           return expiredCache;
         }
-        
-        // Try RSS fallback
-        const rssVideos = await searchYouTubeViaRSS(searchQuery, maxResults);
-        if (rssVideos.length > 0) {
-          setCachedVideos(searchQuery, maxResults, rssVideos);
-          return rssVideos;
-        }
-        
         return [];
       }
-      
+
       // Try expired cache for other errors
       const expiredCache = getCachedVideos(searchQuery, maxResults);
       if (expiredCache) {
         return expiredCache;
       }
-      
+
       return [];
     }
 
@@ -549,7 +464,7 @@ export async function searchCompetitiveExamVideos(
     const response = await fetch(url.toString());
     
     if (!response.ok) {
-      let errBody: any;
+      let errBody: unknown;
       try {
         errBody = await response.json();
       } catch (e) {
@@ -564,25 +479,15 @@ export async function searchCompetitiveExamVideos(
         return [];
       }
 
-      const reason = errBody?.error?.errors?.[0]?.reason;
-      
+      const parsed = parseYouTubeError(errBody);
+      const reason = parsed.reason;
+
       if (reason === 'quotaExceeded') {
-        quotaExceeded = true;
-        console.warn('YouTube API quota exceeded. Attempting fallback methods...');
-        
-        // Try cached data first
+        console.warn('YouTube API quota exceeded. Using cached data if available...');
         const expiredCache = getCachedVideos(searchQuery, maxResults, true);
         if (expiredCache && expiredCache.length > 0) {
           return expiredCache;
         }
-        
-        // Try RSS fallback
-        const rssVideos = await searchYouTubeViaRSS(searchQuery, maxResults);
-        if (rssVideos.length > 0) {
-          setCachedVideos(searchQuery, maxResults, rssVideos);
-          return rssVideos;
-        }
-        
         return [];
       }
       

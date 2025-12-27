@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { StudentNavbar } from '@/components/StudentNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,15 +10,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { searchJobs, type JobResult, extractCompanyName, extractJobType, extractWorkType, type JobSearchParams } from '@/services/jobSearch';
 import { recordActivity } from '@/services/activityTracker';
-import { Loader2, Search, MapPin, Briefcase, Clock, ExternalLink, Bookmark, BookmarkCheck, FileText, Upload } from 'lucide-react';
+import { Loader2, Search, MapPin, Briefcase, Clock, ExternalLink, Bookmark, BookmarkCheck, FileText, Upload, Star, TrendingUp, ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { JobApplicationForm, type JobApplicationData } from '@/components/JobApplicationForm';
+import { analyzeResumeAndGetJobs, type ResumeAnalysisResult, type JobRecommendation } from '@/services/resumeAnalysis';
+import { Progress } from '@/components/ui/progress';
 
 interface SavedJob extends JobResult {
   savedAt: Date;
 }
 
 export default function StudentJobs() {
+  const [showForm, setShowForm] = useState(false); // Don't show form by default, show tabs first
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [applicationData, setApplicationData] = useState<JobApplicationData | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<ResumeAnalysisResult | null>(null);
+  const [jobRecommendations, setJobRecommendations] = useState<JobRecommendation[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+  
   const [searchParams, setSearchParams] = useState<JobSearchParams>({
     field: '',
     location: '',
@@ -32,10 +43,6 @@ export default function StudentJobs() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [selectedJob, setSelectedJob] = useState<JobResult | null>(null);
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [resumeText, setResumeText] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
 
   // Load saved jobs from localStorage
   useEffect(() => {
@@ -112,36 +119,66 @@ export default function StudentJobs() {
     });
   };
 
-  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      setResumeFile(file);
-      try {
-        const { extractTextFromPDF } = await import('@/services/gemini');
-        const text = await extractTextFromPDF(file);
-        setResumeText(text);
-      } catch (error) {
-        console.error('Error extracting PDF text:', error);
-        setResumeText('Failed to extract text from PDF. Please paste the resume text manually.');
-      }
-    }
-  };
-
-  const handleAnalyzeResume = async () => {
-    if (!resumeText.trim()) {
-      alert('Please upload a resume or enter resume text');
-      return;
-    }
-
+  const handleFormSubmit = async (data: JobApplicationData) => {
     setAnalyzing(true);
+    setApplicationData(data);
+    
     try {
-      const { analyzeResume } = await import('@/services/gemini');
-      const jobDesc = selectedJob ? `${selectedJob.title} - ${selectedJob.snippet}` : undefined;
-      const result = await analyzeResume(resumeText, jobDesc);
+      // Build resume text from form data
+      let resumeText = '';
+      
+      if (data.resumeText) {
+        resumeText = data.resumeText;
+      } else if (data.resumeFile) {
+        // Extract text from resume file
+        const { extractResumeText } = await import('@/services/googleVision');
+        resumeText = await extractResumeText(data.resumeFile);
+      } else {
+        // Build resume text from form data
+        resumeText = `
+Name: ${data.fullName}
+Email: ${data.email}
+Phone: ${data.phone}
+Location: ${data.location}
+${data.summary ? `Summary: ${data.summary}` : ''}
+
+Experience:
+${data.experience.map(exp => `${exp.title} at ${exp.company} (${exp.startDate} - ${exp.endDate})\n${exp.description}`).join('\n\n')}
+
+Education:
+${data.education.map(edu => `${edu.degree} in ${edu.field} from ${edu.institution} (${edu.startYear} - ${edu.endYear})`).join('\n')}
+
+Skills: ${data.skills.join(', ')}
+
+Certifications:
+${data.certifications.map(cert => `${cert.name} from ${cert.issuer} (${cert.date})`).join('\n')}
+
+Languages: ${data.languages.join(', ')}
+        `.trim();
+      }
+      
+      // Analyze resume and get job recommendations
+      const result = await analyzeResumeAndGetJobs(
+        data.resumeFile,
+        resumeText,
+        data.location
+      );
+      
       setAnalysisResult(result);
+      setJobRecommendations(result.jobRecommendations);
+      setFormSubmitted(true);
+      setShowForm(false);
+      
+      // Record activity
+      recordActivity('resume_analyzed', { 
+        hasResumeFile: !!data.resumeFile,
+        skillsCount: data.skills.length,
+        experienceCount: data.experience.length
+      });
+      window.dispatchEvent(new CustomEvent('activity-updated'));
     } catch (error) {
       console.error('Error analyzing resume:', error);
-      alert('Failed to analyze resume. Please try again.');
+      alert(`Failed to analyze resume: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
     } finally {
       setAnalyzing(false);
     }
@@ -274,6 +311,28 @@ export default function StudentJobs() {
     );
   };
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const validTabs = useMemo(() => new Set(['search', 'saved', 'resume']), []);
+  const initialHash = (location.hash || '').replace('#', '');
+  const initialTab = validTabs.has(initialHash) ? (initialHash as 'search' | 'saved' | 'resume') : 'search';
+  const [activeTab, setActiveTab] = useState<'search' | 'saved' | 'resume'>(initialTab);
+
+  useEffect(() => {
+    const h = (location.hash || '').replace('#', '');
+    if (validTabs.has(h) && h !== activeTab) {
+      setActiveTab(h as 'search' | 'saved' | 'resume');
+    }
+  }, [location.hash, activeTab, validTabs]);
+
+  const handleTabChange = (value: string) => {
+    if (!validTabs.has(value)) return;
+    setActiveTab(value as 'search' | 'saved' | 'resume');
+    // Update URL hash for shareable links
+    navigate(`/student/jobs#${value}`, { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <StudentNavbar />
@@ -281,13 +340,246 @@ export default function StudentJobs() {
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Job Search</h1>
+          <h1 className="text-3xl font-bold mb-2">Job Search & Recommendations</h1>
           <p className="text-muted-foreground">
-            Find real job openings with working apply links from top job sites
+            {showForm 
+              ? 'Fill out your profile to get personalized job recommendations'
+              : 'AI-powered job recommendations based on your resume'
+            }
           </p>
         </div>
 
-        <Tabs defaultValue="search" className="space-y-6">
+        {/* Show Form - Only when user clicks to show it */}
+        {showForm && !formSubmitted && (
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Job Application Profile</CardTitle>
+                  <CardDescription>
+                    Complete your profile to get the best job recommendations. All fields are optional except Name, Email, and Phone.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowForm(false)}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Search
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <JobApplicationForm onSubmit={handleFormSubmit} loading={analyzing} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Show Recommendations After Form Submission */}
+        {formSubmitted && analysisResult && (
+          <div className="space-y-6 mb-6">
+            {/* Back Button */}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowForm(true);
+                setFormSubmitted(false);
+                setAnalysisResult(null);
+                setJobRecommendations([]);
+              }}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Edit Profile
+            </Button>
+
+            {/* Resume Analysis Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Resume Analysis Summary</CardTitle>
+                <CardDescription>AI-powered analysis of your resume</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-semibold mb-2">Summary</h4>
+                  <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
+                </div>
+                
+                {analysisResult.strengths.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      Strengths
+                    </h4>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      {analysisResult.strengths.map((strength, idx) => (
+                        <li key={idx}>{strength}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {analysisResult.improvements.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Areas for Improvement</h4>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      {analysisResult.improvements.map((improvement, idx) => (
+                        <li key={idx}>{improvement}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {analysisResult.suggestions.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Suggestions</h4>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      {analysisResult.suggestions.map((suggestion, idx) => (
+                        <li key={idx}>{suggestion}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Job Recommendations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-500" />
+                  Top {jobRecommendations.length > 0 ? jobRecommendations.length : 'Job'} Recommendations
+                </CardTitle>
+                <CardDescription>
+                  Jobs matched to your profile with AI-powered scoring
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analyzing ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                    <p className="text-muted-foreground">Analyzing resume and finding matching jobs...</p>
+                    <p className="text-sm text-muted-foreground mt-2">This may take a minute</p>
+                  </div>
+                ) : jobRecommendations.length === 0 ? (
+                  <div className="text-center py-8 space-y-4">
+                    <p className="text-muted-foreground">No job recommendations found yet.</p>
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Try:</p>
+                      <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                        <li>Using the "Search Jobs" tab to find jobs manually</li>
+                        <li>Adding more details to your profile (skills, experience)</li>
+                        <li>Checking your location settings</li>
+                      </ul>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowForm(false);
+                        setFormSubmitted(false);
+                      }}
+                    >
+                      Go to Job Search
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {jobRecommendations.map((rec, index) => {
+                      const job = rec.job;
+                      const companyName = extractCompanyName(job);
+                      const applyLink = job.apply_link || job.link || '#';
+                      
+                      return (
+                        <Card key={index} className="hover:shadow-lg transition-shadow">
+                          <CardHeader>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <CardTitle className="text-lg">{job.title}</CardTitle>
+                                  <Badge 
+                                    variant={rec.matchScore >= 80 ? "default" : rec.matchScore >= 60 ? "secondary" : "outline"}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <Star className="h-3 w-3" />
+                                    {rec.matchScore}% Match
+                                  </Badge>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <Briefcase className="h-3 w-3" />
+                                    {companyName}
+                                  </Badge>
+                                  <Badge variant="outline" className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {job.location || 'Not specified'}
+                                  </Badge>
+                                </div>
+                                <div className="mb-3">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs text-muted-foreground">Match Score</span>
+                                    <span className="text-xs font-semibold">{rec.matchScore}%</span>
+                                  </div>
+                                  <Progress value={rec.matchScore} className="h-2" />
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                  {rec.matchReason}
+                                </p>
+                                {rec.skillsMatch.length > 0 && (
+                                  <div className="mb-2">
+                                    <p className="text-xs font-semibold mb-1">Matching Skills:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {rec.skillsMatch.map((skill, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs">
+                                          {skill}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {rec.missingSkills.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-semibold mb-1 text-orange-600">Missing Skills:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {rec.missingSkills.map((skill, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs text-orange-600">
+                                          {skill}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex gap-2">
+                              <Button
+                                className="flex-1"
+                                onClick={() => window.open(applyLink, '_blank', 'noopener,noreferrer')}
+                              >
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                Apply Now
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedJob(job);
+                                }}
+                              >
+                                View Details
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+  <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList>
             <TabsTrigger value="search">Search Jobs</TabsTrigger>
             <TabsTrigger value="saved">Saved Jobs ({savedJobs.length})</TabsTrigger>
@@ -465,119 +757,45 @@ export default function StudentJobs() {
             )}
           </TabsContent>
 
-          {/* Resume Analysis Tab */}
+          {/* Resume Analysis Tab - Shows form */}
           <TabsContent value="resume" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Resume & Cover Letter Suggestions</CardTitle>
-                <CardDescription>
-                  Upload your resume or paste resume text to get AI-powered suggestions
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="resume-upload">Upload Resume (PDF)</Label>
-                  <div className="flex items-center gap-4">
-                    <Input
-                      id="resume-upload"
-                      type="file"
-                      accept=".pdf"
-                      onChange={handleResumeUpload}
-                      className="flex-1"
-                    />
-                    {resumeFile && (
-                      <Badge variant="secondary">
-                        <FileText className="h-3 w-3 mr-1" />
-                        {resumeFile.name}
-                      </Badge>
-                    )}
+            {!showForm ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground mb-4">
+                    Fill out your profile to get AI-powered job recommendations based on your resume
+                  </p>
+                  <Button onClick={() => setShowForm(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Start Application Form
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Job Application Profile</CardTitle>
+                      <CardDescription>
+                        Complete your profile to get the best job recommendations. All fields are optional except Name, Email, and Phone.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowForm(false)}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back
+                    </Button>
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="resume-text">Or Paste Resume Text</Label>
-                  <Textarea
-                    id="resume-text"
-                    placeholder="Paste your resume content here..."
-                    value={resumeText}
-                    onChange={(e) => setResumeText(e.target.value)}
-                    rows={10}
-                  />
-                </div>
-
-                {selectedJob && (
-                  <div className="p-4 bg-accent rounded-lg">
-                    <p className="text-sm font-semibold mb-2">Analyzing for:</p>
-                    <p className="text-sm">{selectedJob.title}</p>
-                  </div>
-                )}
-
-                <Button
-                  className="w-full"
-                  onClick={handleAnalyzeResume}
-                  disabled={analyzing || !resumeText.trim()}
-                >
-                  {analyzing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Analyze Resume
-                    </>
-                  )}
-                </Button>
-
-                {analysisResult && (
-                  <Card className="mt-6">
-                    <CardHeader>
-                      <CardTitle>Analysis Results</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <h4 className="font-semibold mb-2">Summary</h4>
-                        <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
-                      </div>
-                      
-                      {analysisResult.strengths.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Strengths</h4>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                            {analysisResult.strengths.map((strength: string, idx: number) => (
-                              <li key={idx}>{strength}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {analysisResult.improvements.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Areas for Improvement</h4>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                            {analysisResult.improvements.map((improvement: string, idx: number) => (
-                              <li key={idx}>{improvement}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {analysisResult.suggestions.length > 0 && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Suggestions</h4>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                            {analysisResult.suggestions.map((suggestion: string, idx: number) => (
-                              <li key={idx}>{suggestion}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  <JobApplicationForm onSubmit={handleFormSubmit} loading={analyzing} />
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </main>

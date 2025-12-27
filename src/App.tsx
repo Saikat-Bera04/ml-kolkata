@@ -45,89 +45,83 @@ const App = () => (
             <ChatbotWidget />
             <Routes>
               <Route path="/" element={<Index />} />
-            
+
               {/* Student Routes */}
               <Route path="/student/signup" element={<StudentSignup />} />
               <Route path="/student/login" element={<StudentLogin />} />
-              <Route 
-                path="/student/dashboard" 
+              <Route
+                path="/student/dashboard"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentDashboard />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/about" 
+              <Route
+                path="/student/about"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentAbout />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/learning" 
+              <Route
+                path="/student/learning"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentLearning />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/competitive-exams" 
+              <Route
+                path="/student/competitive-exams"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentCompetitiveExams />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/study-notes" 
+              <Route
+                path="/student/study-notes"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentStudyNotes />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/practice" 
+              <Route
+                path="/student/practice"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentPractice />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/podcasts" 
+              <Route
+                path="/student/podcasts"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentPodcasts />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/jobs" 
+              {/* Make jobs public so navbar click works even when not signed in */}
+              <Route path="/student/jobs" element={<StudentJobs />} />
+              <Route
+                path="/student/timetable"
                 element={
-                  <ProtectedRoute allowedRoles={['student']}>
-                    <StudentJobs />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/student/timetable" 
-                element={
-                  <ProtectedRoute allowedRoles={['student']}>
+                  <ProtectedRoute allowedRoles={["student"]}>
                     <StudentTimetable />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/student/profile" 
+              <Route
+                path="/student/profile"
                 element={
-                  <ProtectedRoute allowedRoles={['student', 'mentor']}>
+                  <ProtectedRoute allowedRoles={["student", "mentor"]}>
                     <StudentProfile />
                   </ProtectedRoute>
-                } 
+                }
               />
               <Route 
                 path="/student/settings" 
