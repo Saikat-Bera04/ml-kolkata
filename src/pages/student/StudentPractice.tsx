@@ -53,6 +53,7 @@ import {
   PieChart as PieChartIcon,
   Activity,
   Lightbulb,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -126,25 +127,39 @@ export default function StudentPractice() {
     // Fetch videos for top 6 weak areas
     const topWeakAreas = weakAreas.slice(0, 6);
     
-    for (const area of topWeakAreas) {
+    // Fetch videos in parallel for better performance
+    const videoPromises = topWeakAreas.map(async (area) => {
       const key = `${area.subject}::${area.topic}`;
       
       // Skip if already loaded or loading
       if (weakAreaVideos.has(key) || loadingVideos.has(key)) {
-        continue;
+        return;
       }
 
       setLoadingVideos(prev => new Set(prev).add(key));
 
       try {
-        const videos = await searchVideosForTopic(area.topic, area.subject, 3);
-        setWeakAreaVideos(prev => {
-          const newMap = new Map(prev);
-          newMap.set(key, videos);
-          return newMap;
-        });
+        console.log(`Fetching YouTube videos for weak area: ${area.topic} (${area.subject})`);
+        const videos = await searchVideosForTopic(area.topic, area.subject, 5); // Get 5 videos per topic
+        
+        if (videos.length > 0) {
+          console.log(`Successfully fetched ${videos.length} videos for ${area.topic}`);
+          setWeakAreaVideos(prev => {
+            const newMap = new Map(prev);
+            newMap.set(key, videos);
+            return newMap;
+          });
+        } else {
+          console.warn(`No videos found for ${area.topic}`);
+        }
       } catch (error) {
         console.error(`Error fetching videos for ${area.topic}:`, error);
+        // Set empty array to indicate we tried but failed
+        setWeakAreaVideos(prev => {
+          const newMap = new Map(prev);
+          newMap.set(key, []);
+          return newMap;
+        });
       } finally {
         setLoadingVideos(prev => {
           const newSet = new Set(prev);
@@ -152,7 +167,10 @@ export default function StudentPractice() {
           return newSet;
         });
       }
-    }
+    });
+
+    // Wait for all video fetches to complete
+    await Promise.all(videoPromises);
   };
 
   const generateInsights = (
@@ -569,12 +587,16 @@ export default function StudentPractice() {
 
                           {/* Suggested YouTube Videos */}
                           {isLoading && (
-                            <div className="text-xs text-muted-foreground">Loading videos...</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2 border-t pt-3">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Loading videos...
+                            </div>
                           )}
                           {!isLoading && videos.length > 0 && (
                             <div className="space-y-2 border-t pt-3">
-                              <div className="text-xs font-semibold text-muted-foreground mb-2">
-                                Suggested Videos:
+                              <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                                <Zap className="h-3 w-3 text-primary" />
+                                Suggested Videos to Improve:
                               </div>
                               {videos.map((video, vidIndex) => (
                                 <a
@@ -582,15 +604,15 @@ export default function StudentPractice() {
                                   href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex gap-2 p-2 rounded-lg border hover:bg-muted transition-colors group"
+                                  className="flex gap-2 p-2 rounded-lg border hover:bg-muted hover:border-primary transition-all group"
                                 >
                                   <img
                                     src={video.snippet.thumbnails.medium.url}
                                     alt={video.snippet.title}
-                                    className="w-16 h-12 object-cover rounded flex-shrink-0"
+                                    className="w-20 h-14 object-cover rounded flex-shrink-0"
                                   />
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-xs font-medium line-clamp-2 group-hover:text-primary">
+                                    <div className="text-xs font-medium line-clamp-2 group-hover:text-primary transition-colors">
                                       {video.snippet.title}
                                     </div>
                                     <div className="text-[10px] text-muted-foreground mt-1">
@@ -599,6 +621,11 @@ export default function StudentPractice() {
                                   </div>
                                 </a>
                               ))}
+                            </div>
+                          )}
+                          {!isLoading && videos.length === 0 && weakAreaVideos.has(videoKey) && (
+                            <div className="text-xs text-muted-foreground border-t pt-3">
+                              No videos found. Try searching manually on YouTube.
                             </div>
                           )}
 

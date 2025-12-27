@@ -13,10 +13,12 @@ import { getActivityStreak, recordActivity, getTotalActivityCount } from '@/serv
 import { 
   analyzeLearnerPerformance, 
   getRecommendedVideos,
+  getSubjectRecommendedVideos,
   type AdaptiveLearningInsights 
 } from '@/services/personalizedRecommendations';
 import { getWeakAreas, getSubjectPerformance, getQuizResults } from '@/services/quizResults';
 import { type YouTubeVideo } from '@/services/youtube';
+import { youtubeQueue } from '@/services/youtubeQueue';
 import { supabase } from '@/integrations/supabase/client';
 import { getTodayGoals, addGoal, toggleGoal, deleteGoal, createGoalFromSession, type Goal } from '@/services/goals';
 import { getUpcomingSessions, getSessionsByDay, type DayOfWeek } from '@/services/timetable';
@@ -36,6 +38,7 @@ import {
   Trash2,
   CheckCircle2,
   Circle,
+  Loader2,
 } from 'lucide-react';
 
 export default function StudentDashboard() {
@@ -45,7 +48,9 @@ export default function StudentDashboard() {
   const [streak, setStreak] = useState(0);
   const [insights, setInsights] = useState<AdaptiveLearningInsights | null>(null);
   const [recommendedVideos, setRecommendedVideos] = useState<Map<string, YouTubeVideo[]>>(new Map());
+  const [subjectVideos, setSubjectVideos] = useState<Map<string, YouTubeVideo[]>>(new Map());
   const [loadingVideos, setLoadingVideos] = useState(false);
+  const [videoQueueStatus, setVideoQueueStatus] = useState<string>('');
   const [userName, setUserName] = useState('Student');
   const [todayGoals, setTodayGoals] = useState<Goal[]>([]);
   const [newGoalText, setNewGoalText] = useState('');
@@ -178,18 +183,36 @@ export default function StudentDashboard() {
     const adaptiveInsights = analyzeLearnerPerformance();
     setInsights(adaptiveInsights);
 
-    // Load recommended videos for weak areas
-    const weakAreas = getWeakAreas();
-    if (weakAreas.length > 0) {
-      setLoadingVideos(true);
-      try {
+    setLoadingVideos(true);
+    setVideoQueueStatus('Fetching recommended videos...');
+
+    try {
+      // Load recommended videos for weak areas (one API call at a time via queue)
+      const weakAreas = getWeakAreas();
+      if (weakAreas.length > 0) {
+        setVideoQueueStatus(`Loading videos for ${weakAreas.length} weak areas...`);
         const videoMap = await getRecommendedVideos(weakAreas, 6);
         setRecommendedVideos(videoMap);
-      } catch (error) {
-        console.error('Error loading recommended videos:', error);
-      } finally {
-        setLoadingVideos(false);
+        console.log(`[Dashboard] Loaded ${videoMap.size} weak area video sets`);
       }
+
+      // Load videos for focus subjects from study plan (one API call at a time via queue)
+      if (adaptiveInsights.studyPlan.focusSubjects.length > 0) {
+        setVideoQueueStatus(`Loading videos for ${adaptiveInsights.studyPlan.focusSubjects.length} focus subjects...`);
+        const subjectVideoMap = await getSubjectRecommendedVideos(
+          adaptiveInsights.studyPlan.focusSubjects,
+          4 // 4 videos per subject
+        );
+        setSubjectVideos(subjectVideoMap);
+        console.log(`[Dashboard] Loaded ${subjectVideoMap.size} subject video sets`);
+      }
+
+      setVideoQueueStatus('');
+    } catch (error) {
+      console.error('Error loading recommended videos:', error);
+      setVideoQueueStatus('Error loading videos. Using cached data if available.');
+    } finally {
+      setLoadingVideos(false);
     }
   };
 
@@ -613,87 +636,178 @@ export default function StudentDashboard() {
         )}
 
         {/* YouTube Video Recommendations Section */}
-        {recommendedVideos.size > 0 && (
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PlayCircle className="h-5 w-5" />
-                  Recommended YouTube Videos
-                </CardTitle>
+        {(recommendedVideos.size > 0 || subjectVideos.size > 0) && (
+          <div className="mt-6 space-y-6">
+            {/* Weak Areas Videos */}
+            {recommendedVideos.size > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PlayCircle className="h-5 w-5" />
+                    Recommended Videos for Weak Areas
+                  </CardTitle>
                 <CardDescription>
-                  Personalized video suggestions based on your weak areas
+                  Personalized video suggestions to improve your weak topics
+                  {videoQueueStatus && (
+                    <span className="ml-2 text-xs text-muted-foreground">({videoQueueStatus})</span>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingVideos ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Loading recommended videos...
+                  <div className="text-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                    <p className="text-sm text-muted-foreground">{videoQueueStatus || 'Loading recommended videos...'}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Processing one request at a time to save API quota
+                    </p>
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                    {Array.from(recommendedVideos.entries()).map(([key, videos]) => {
-                      const [subject, topic] = key.split('::');
-                      return (
-                        <div key={key} className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                            <h4 className="font-semibold">
-                              {topic} ({subject})
-                            </h4>
-                            <Badge variant="destructive" className="text-xs">
-                              Weak Area
-                            </Badge>
-                          </div>
-                          <div className="grid md:grid-cols-2 gap-4">
-                            {videos.map((video) => (
-                              <div
-                                key={video.id.videoId}
-                                className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
-                              >
-                                <div className="relative aspect-video bg-muted">
-                                  <img
-                                    src={video.snippet.thumbnails.medium.url}
-                                    alt={video.snippet.title}
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
+                    <div className="space-y-6">
+                      {Array.from(recommendedVideos.entries()).map(([key, videos]) => {
+                        const [subject, topic] = key.split('::');
+                        return (
+                          <div key={key} className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                              <h4 className="font-semibold">
+                                {topic} ({subject})
+                              </h4>
+                              <Badge variant="destructive" className="text-xs">
+                                Weak Area
+                              </Badge>
+                            </div>
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {videos.map((video) => (
+                                <div
+                                  key={video.id.videoId}
+                                  className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+                                >
+                                  <div className="relative aspect-video bg-muted">
+                                    <img
+                                      src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
+                                      alt={video.snippet.title}
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+                                      <a
+                                        href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-white hover:scale-110 transition-transform"
+                                        onClick={() => {
+                                          recordActivity('video_watched', { 
+                                            videoId: video.id.videoId, 
+                                            title: video.snippet.title,
+                                            source: 'dashboard_weak_area'
+                                          });
+                                          window.dispatchEvent(new CustomEvent('activity-updated'));
+                                        }}
+                                      >
+                                        <PlayCircle className="h-12 w-12" />
+                                      </a>
+                                    </div>
+                                  </div>
+                                  <div className="p-3">
+                                    <h5 className="font-medium text-sm line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+                                      {video.snippet.title}
+                                    </h5>
+                                    <p className="text-xs text-muted-foreground line-clamp-1">
+                                      {video.snippet.channelTitle}
+                                    </p>
                                     <a
                                       href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-white hover:scale-110 transition-transform"
+                                      className="text-xs text-primary hover:underline mt-2 inline-block"
                                     >
-                                      <PlayCircle className="h-12 w-12" />
+                                      Watch on YouTube →
                                     </a>
                                   </div>
                                 </div>
-                                <div className="p-3">
-                                  <h5 className="font-medium text-sm line-clamp-2 mb-1">
-                                    {video.snippet.title}
-                                  </h5>
-                                  <p className="text-xs text-muted-foreground line-clamp-1">
-                                    {video.snippet.channelTitle}
-                                  </p>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Focus Subjects Videos */}
+            {subjectVideos.size > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Video className="h-5 w-5" />
+                    Recommended Videos for Focus Subjects
+                  </CardTitle>
+                  <CardDescription>
+                    Curated videos for subjects you should focus on based on your study plan
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {Array.from(subjectVideos.entries()).map(([subject, videos]) => (
+                      <div key={subject} className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-primary" />
+                          <h4 className="font-semibold">{subject}</h4>
+                          <Badge variant="secondary" className="text-xs">
+                            Focus Subject
+                          </Badge>
+                        </div>
+                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {videos.map((video) => (
+                            <div
+                              key={video.id.videoId}
+                              className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+                            >
+                              <div className="relative aspect-video bg-muted">
+                                <img
+                                  src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
+                                  alt={video.snippet.title}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
                                   <a
                                     href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs text-primary hover:underline mt-2 inline-block"
+                                    className="text-white hover:scale-110 transition-transform"
+                                    onClick={() => {
+                                      recordActivity('video_watched', { 
+                                        videoId: video.id.videoId, 
+                                        title: video.snippet.title,
+                                        subject: subject,
+                                        source: 'dashboard_focus_subject'
+                                      });
+                                      window.dispatchEvent(new CustomEvent('activity-updated'));
+                                    }}
                                   >
-                                    Watch on YouTube →
+                                    <PlayCircle className="h-10 w-10" />
                                   </a>
                                 </div>
                               </div>
-                            ))}
-                          </div>
+                              <div className="p-3">
+                                <h5 className="font-medium text-sm line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+                                  {video.snippet.title}
+                                </h5>
+                                <p className="text-xs text-muted-foreground line-clamp-1">
+                                  {video.snippet.channelTitle}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 

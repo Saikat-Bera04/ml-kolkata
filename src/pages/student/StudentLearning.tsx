@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { subjectData, type StreamData, type Subject } from '@/data/subjects';
-import { searchYouTubeVideos, getEmbedUrl, type YouTubeVideo } from '@/services/youtube';
+import { searchYouTubeVideos, getEmbedUrl, getVideosFromChannel, type YouTubeVideo } from '@/services/youtube';
 import { recordActivity } from '@/services/activityTracker';
 import { Loader2, Play, ArrowLeft, BookOpen } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -58,13 +58,60 @@ export default function StudentLearning() {
     setSelectedSubject(subject);
     setLoading(true);
     setCurrentView('videos');
+    setVideos([]); // Clear previous videos
 
     try {
-      const fetchedVideos = await searchYouTubeVideos(subject.name, 12);
-      setVideos(fetchedVideos);
-    } catch (error) {
+      console.log(`Fetching YouTube videos for subject: ${subject.name}`);
+      // Enhanced search: include stream, year, semester context for better results
+      const searchQuery = `${streamData?.stream || ''} ${subject.name} ${selectedYear} year semester ${selectedSemester} tutorial lecture`;
+      let fetchedVideos = await searchYouTubeVideos(searchQuery.trim(), 15);
+
+      // If no videos found from search, try a simpler query
+      if (!fetchedVideos || fetchedVideos.length === 0) {
+        console.log(`No videos from enhanced query, trying simple subject search for ${subject.name}`);
+        fetchedVideos = await searchYouTubeVideos(subject.name, 15);
+      }
+
+      // If still nothing, and developer provided a channel id (your own channel), fetch videos from your uploads playlist
+      const YOUTUBE_CHANNEL_ID = import.meta.env.VITE_YOUTUBE_CHANNEL_ID as string | undefined;
+      if ((!fetchedVideos || fetchedVideos.length === 0) && YOUTUBE_CHANNEL_ID) {
+        console.log('Falling back to channel uploads playlist because search returned no results or quota may be limited');
+        const channelVideos = await getVideosFromChannel(YOUTUBE_CHANNEL_ID, 15);
+        if (channelVideos && channelVideos.length > 0) {
+          setVideos(channelVideos);
+          return;
+        }
+      }
+
+      if (fetchedVideos && fetchedVideos.length > 0) {
+        console.log(`Successfully fetched ${fetchedVideos.length} videos for ${subject.name}`);
+        setVideos(fetchedVideos);
+      } else {
+        setVideos([]);
+      }
+    } catch (error: unknown) {
       console.error('Error fetching videos:', error);
-      setVideos([]);
+
+      // Normalize error message
+      let msg = '';
+      if (typeof error === 'string') msg = error;
+  else if (error && typeof error === 'object' && 'message' in error) msg = String((error as { message?: unknown }).message ?? '');
+      else msg = String(error);
+
+      // If quota exceeded, try to fallback to channel uploads if configured
+      const YOUTUBE_CHANNEL_ID = import.meta.env.VITE_YOUTUBE_CHANNEL_ID as string | undefined;
+      if (msg.toLowerCase().includes('quota') && YOUTUBE_CHANNEL_ID) {
+        console.log('Quota exceeded - falling back to channel uploads playlist');
+        try {
+          const channelVideos = await getVideosFromChannel(YOUTUBE_CHANNEL_ID, 15);
+          setVideos(channelVideos);
+        } catch (e) {
+          console.error('Fallback to channel videos failed:', e);
+          setVideos([]);
+        }
+      } else {
+        setVideos([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -208,56 +255,92 @@ export default function StudentLearning() {
       <div>
         <h2 className="text-2xl font-bold mb-2">{selectedSubject?.name}</h2>
         <p className="text-muted-foreground">
-          YouTube videos for {selectedSubject?.name}
+          Curated YouTube videos for {selectedSubject?.name} - {streamData?.stream} Year {selectedYear} Semester {selectedSemester}
         </p>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-muted-foreground">Fetching videos...</span>
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+          <span className="text-muted-foreground">Fetching videos from YouTube...</span>
+          <span className="text-xs text-muted-foreground mt-1">This may take a few seconds</span>
         </div>
       ) : videos.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              No videos found for this subject. Please try again later.
+            <Play className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground mb-2 font-medium">
+              No videos found for this subject.
             </p>
+            <div className="text-xs text-muted-foreground space-y-1 mb-4">
+              <p>Possible reasons:</p>
+              <ul className="list-disc list-inside text-left max-w-md mx-auto space-y-1">
+                <li>YouTube API quota exceeded (daily limit reached)</li>
+                <li>No cached videos available</li>
+                <li>Network or API key issues</li>
+              </ul>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => selectedSubject && handleSubjectSelect(selectedSubject)}
+              >
+                Retry
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(`${selectedSubject?.name} tutorial lecture`), '_blank')}
+              >
+                Search on YouTube
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {videos.map((video) => (
-            <Card key={video.id.videoId} className="overflow-hidden">
-              <div className="relative aspect-video bg-muted">
-                <img
-                  src={video.snippet.thumbnails.medium.url}
-                  alt={video.snippet.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                  <Play className="h-12 w-12 text-white" />
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Found {videos.length} educational videos
+            </p>
+            <Badge variant="secondary">
+              {streamData?.stream} - Sem {selectedSemester}
+            </Badge>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {videos.map((video) => (
+              <Card key={video.id.videoId} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="relative aspect-video bg-muted cursor-pointer group">
+                  <img
+                    src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
+                    alt={video.snippet.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Play className="h-12 w-12 text-white" />
+                  </div>
                 </div>
-              </div>
-              <CardHeader>
-                <CardTitle className="text-base line-clamp-2">
-                  {video.snippet.title}
-                </CardTitle>
-                <CardDescription className="flex items-center gap-2 mt-2">
-                  <Badge variant="secondary">{video.snippet.channelTitle}</Badge>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  className="w-full"
-                  onClick={() => handleVideoClick(video)}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Watch
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                <CardHeader>
+                  <CardTitle className="text-base line-clamp-2 hover:text-primary transition-colors">
+                    {video.snippet.title}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {video.snippet.channelTitle}
+                    </Badge>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    className="w-full"
+                    onClick={() => handleVideoClick(video)}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Watch Video
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>

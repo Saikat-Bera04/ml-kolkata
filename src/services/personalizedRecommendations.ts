@@ -10,6 +10,7 @@ import {
   type SubjectPerformance,
 } from './quizResults';
 import { searchYouTubeVideos, searchVideosForTopic, type YouTubeVideo } from './youtube';
+import { queueSubjectVideos, queueTopicVideos } from './youtubeQueue';
 
 export interface PersonalizedRecommendation {
   type: 'video' | 'practice' | 'review' | 'study_plan';
@@ -251,7 +252,7 @@ function generateRecommendations(
 }
 
 /**
- * Get YouTube videos for weak areas
+ * Get YouTube videos for weak areas using queue (one API call at a time)
  */
 export async function getRecommendedVideos(
   weakAreas: WeakArea[],
@@ -259,22 +260,71 @@ export async function getRecommendedVideos(
 ): Promise<Map<string, YouTubeVideo[]>> {
   const videoMap = new Map<string, YouTubeVideo[]>();
 
-  // Get videos for top weak areas
-  const topWeakAreas = weakAreas.slice(0, Math.min(3, weakAreas.length));
+  // Get videos for top weak areas (prioritize by accuracy - lowest first)
+  const topWeakAreas = weakAreas
+    .sort((a, b) => a.accuracy - b.accuracy) // Sort by accuracy (lowest first)
+    .slice(0, Math.min(5, weakAreas.length)); // Get top 5 weakest areas
   
-  for (const area of topWeakAreas) {
+  console.log(`[Recommendations] Fetching videos for ${topWeakAreas.length} weak areas using queue...`);
+  
+  // Queue all requests - they will be processed one at a time
+  const videoPromises = topWeakAreas.map(async (area) => {
     try {
-      // Search for videos using the topic-specific search function
-      const videos = await searchVideosForTopic(area.topic, area.subject, 2);
+      const key = `${area.subject}::${area.topic}`;
+      
+      // Use queue to ensure only one API call at a time
+      const videos = await queueTopicVideos(area.topic, area.subject, 3);
       
       if (videos.length > 0) {
-        const key = `${area.subject}::${area.topic}`;
         videoMap.set(key, videos);
+        console.log(`[Recommendations] Fetched ${videos.length} videos for ${area.topic}`);
+      } else {
+        console.warn(`[Recommendations] No videos found for ${area.topic}`);
       }
     } catch (error) {
-      console.error(`Error fetching videos for ${area.topic}:`, error);
+      console.error(`[Recommendations] Error fetching videos for ${area.topic}:`, error);
     }
+  });
+
+  // Wait for all queued requests to complete (they process sequentially)
+  await Promise.all(videoPromises);
+
+  console.log(`[Recommendations] Completed fetching videos. Total: ${videoMap.size} topics with videos`);
+  return videoMap;
+}
+
+/**
+ * Get recommended videos for focus subjects (from study plan)
+ */
+export async function getSubjectRecommendedVideos(
+  subjects: string[],
+  maxVideosPerSubject: number = 3
+): Promise<Map<string, YouTubeVideo[]>> {
+  const videoMap = new Map<string, YouTubeVideo[]>();
+
+  if (subjects.length === 0) {
+    return videoMap;
   }
+
+  console.log(`[Recommendations] Fetching videos for ${subjects.length} focus subjects using queue...`);
+
+  // Queue requests for each subject
+  const videoPromises = subjects.map(async (subject) => {
+    try {
+      // Use queue to ensure only one API call at a time
+      const videos = await queueSubjectVideos(subject, maxVideosPerSubject);
+      
+      if (videos.length > 0) {
+        videoMap.set(subject, videos);
+        console.log(`[Recommendations] Fetched ${videos.length} videos for ${subject}`);
+      }
+    } catch (error) {
+      console.error(`[Recommendations] Error fetching videos for ${subject}:`, error);
+    }
+  });
+
+  // Wait for all queued requests to complete
+  await Promise.all(videoPromises);
 
   return videoMap;
 }

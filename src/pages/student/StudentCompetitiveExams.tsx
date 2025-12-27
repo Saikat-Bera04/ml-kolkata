@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { competitiveExams, type ExamCategory, type ExamSubcategory } from '@/data/competitiveExams';
 import { searchCompetitiveExamVideos, getEmbedUrl, type YouTubeVideo } from '@/services/youtube';
+import { recordActivity } from '@/services/activityTracker';
 import { Loader2, Play, ArrowLeft, GraduationCap, BookOpen } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -30,10 +31,33 @@ export default function StudentCompetitiveExams() {
     setSelectedSubcategory(subcategory);
     setLoading(true);
     setCurrentView('videos');
+    setVideos([]); // Clear previous videos
 
     try {
-      const fetchedVideos = await searchCompetitiveExamVideos(subcategory.searchKeywords, 15);
-      setVideos(fetchedVideos);
+      console.log(`Fetching YouTube videos for competitive exam: ${subcategory.name}`);
+      console.log(`Search keywords: ${subcategory.searchKeywords.join(', ')}`);
+      
+      // Enhanced search with exam name and subcategory
+      const enhancedKeywords = [
+        ...subcategory.searchKeywords,
+        selectedExam?.name || '',
+        'preparation',
+        'tutorial',
+        'lecture',
+        'competitive exam'
+      ].filter(Boolean);
+      
+      const fetchedVideos = await searchCompetitiveExamVideos(enhancedKeywords, 18);
+      
+      if (fetchedVideos.length > 0) {
+        console.log(`Successfully fetched ${fetchedVideos.length} videos for ${subcategory.name}`);
+        setVideos(fetchedVideos);
+      } else {
+        // Fallback: try with just subcategory keywords
+        console.log(`Trying fallback search for ${subcategory.name}`);
+        const fallbackVideos = await searchCompetitiveExamVideos(subcategory.searchKeywords, 18);
+        setVideos(fallbackVideos);
+      }
     } catch (error) {
       console.error('Error fetching videos:', error);
       setVideos([]);
@@ -43,6 +67,13 @@ export default function StudentCompetitiveExams() {
   };
 
   const handleVideoClick = (video: YouTubeVideo) => {
+    recordActivity('video_watched', { 
+      videoId: video.id.videoId, 
+      title: video.snippet.title,
+      exam: selectedExam?.name,
+      subcategory: selectedSubcategory?.name
+    });
+    window.dispatchEvent(new CustomEvent('activity-updated'));
     setSelectedVideo(video);
     setIsVideoDialogOpen(true);
   };
@@ -136,53 +167,87 @@ export default function StudentCompetitiveExams() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-muted-foreground">Fetching videos...</span>
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+          <span className="text-muted-foreground">Fetching videos from YouTube...</span>
+          <span className="text-xs text-muted-foreground mt-1">Searching for the best preparation videos</span>
         </div>
       ) : videos.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              No videos found for this topic. Please try again later.
+            <Play className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground mb-2 font-medium">
+              No videos found for this topic.
             </p>
+            <div className="text-xs text-muted-foreground space-y-1 mb-4">
+              <p>Possible reasons:</p>
+              <ul className="list-disc list-inside text-left max-w-md mx-auto space-y-1">
+                <li>YouTube API quota exceeded (daily limit reached)</li>
+                <li>No cached videos available</li>
+                <li>Network or API key issues</li>
+              </ul>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => selectedSubcategory && handleSubcategorySelect(selectedSubcategory)}
+              >
+                Retry
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(`${selectedSubcategory?.name} ${selectedExam?.name} preparation`), '_blank')}
+              >
+                Search on YouTube
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {videos.map((video) => (
-            <Card key={video.id.videoId} className="overflow-hidden">
-              <div className="relative aspect-video bg-muted cursor-pointer group">
-                <img
-                  src={video.snippet.thumbnails.medium.url}
-                  alt={video.snippet.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="h-12 w-12 text-white" />
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Found {videos.length} preparation videos
+            </p>
+            <Badge variant="secondary">
+              {selectedExam?.name}
+            </Badge>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {videos.map((video) => (
+              <Card key={video.id.videoId} className="overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="relative aspect-video bg-muted cursor-pointer group">
+                  <img
+                    src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
+                    alt={video.snippet.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Play className="h-12 w-12 text-white" />
+                  </div>
                 </div>
-              </div>
-              <CardHeader>
-                <CardTitle className="text-base line-clamp-2">
-                  {video.snippet.title}
-                </CardTitle>
-                <CardDescription className="flex items-center gap-2 mt-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {video.snippet.channelTitle}
-                  </Badge>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  className="w-full"
-                  onClick={() => handleVideoClick(video)}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Watch Now
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                <CardHeader>
+                  <CardTitle className="text-base line-clamp-2 hover:text-primary transition-colors">
+                    {video.snippet.title}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {video.snippet.channelTitle}
+                    </Badge>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    className="w-full"
+                    onClick={() => handleVideoClick(video)}
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Watch Now
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>
