@@ -341,6 +341,11 @@ export function getDifficultyDistribution(): DifficultyDistribution {
   return distribution;
 }
 
+// Get weak areas with YouTube video suggestions
+export interface WeakAreaWithVideos extends WeakArea {
+  suggestedVideos?: any[]; // YouTubeVideo[] from youtube service
+}
+
 // Get skill radar data
 export interface SkillRadarData {
   speed: number; // 0-100 based on time efficiency

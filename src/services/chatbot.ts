@@ -1,4 +1,5 @@
 import { generateGeminiText } from './gemini';
+import { trackChatbotInteraction } from './wandb';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -85,7 +86,23 @@ export async function sendChatToAssistant(
   history: ChatMessage[],
   profile: ProfileSignals
 ): Promise<string> {
-  if (!isEducationalPrompt(prompt)) {
+  const startTime = Date.now();
+  const isEducational = isEducationalPrompt(prompt);
+
+  if (!isEducational) {
+    // Track non-educational prompts
+    trackChatbotInteraction({
+      userQuestion: prompt,
+      response: EDUCATION_ONLY_RESPONSE,
+      responseTime: Date.now() - startTime,
+      isEducational: false,
+      userProfile: {
+        quizAccuracy: profile.quizAccuracy,
+        recentSubjects: profile.recentSubjects,
+        weakConcepts: profile.weakConcepts,
+      },
+    }).catch(console.error);
+    
     return EDUCATION_ONLY_RESPONSE;
   }
 
@@ -103,10 +120,44 @@ Learner: ${prompt}
 Spark AI:`;
 
   try {
-    return await generateGeminiText(fullPrompt);
+    const response = await generateGeminiText(fullPrompt);
+    const responseTime = Date.now() - startTime;
+
+    // Track successful educational interactions
+    trackChatbotInteraction({
+      userQuestion: prompt,
+      response: response,
+      responseTime: responseTime,
+      isEducational: true,
+      userProfile: {
+        quizAccuracy: profile.quizAccuracy,
+        recentSubjects: profile.recentSubjects,
+        weakConcepts: profile.weakConcepts,
+      },
+    }).catch(console.error);
+
+    return response;
   } catch (error) {
+    const responseTime = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const fallbackResponse = generateFallbackResponse(prompt, profile);
+
+    // Track errors
+    trackChatbotInteraction({
+      userQuestion: prompt,
+      response: fallbackResponse,
+      responseTime: responseTime,
+      isEducational: true,
+      error: errorMessage,
+      userProfile: {
+        quizAccuracy: profile.quizAccuracy,
+        recentSubjects: profile.recentSubjects,
+        weakConcepts: profile.weakConcepts,
+      },
+    }).catch(console.error);
+
     console.error('Chatbot error', error);
-    return generateFallbackResponse(prompt, profile);
+    return fallbackResponse;
   }
 }
 

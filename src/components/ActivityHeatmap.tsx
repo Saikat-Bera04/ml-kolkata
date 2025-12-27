@@ -47,17 +47,22 @@ export function ActivityHeatmap() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Calculate start date (53 weeks ago, align to Sunday)
+    // Calculate start date (53 weeks ago)
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - (53 * 7));
-    
-    // Align to Sunday (start of week)
-    const startDayOfWeek = startDate.getDay();
-    startDate.setDate(startDate.getDate() - startDayOfWeek);
     startDate.setHours(0, 0, 0, 0);
     
+    // Align to Sunday (start of week) - GitHub style
+    const startDayOfWeek = startDate.getDay();
+    const alignedStartDate = new Date(startDate);
+    alignedStartDate.setDate(startDate.getDate() - startDayOfWeek);
+    alignedStartDate.setHours(0, 0, 0, 0);
+    
     // Create a map for quick lookup
-    const dataMap = new Map(heatmapData.map(d => [d.date, d]));
+    const dataMap = new Map<string, HeatmapCell>();
+    heatmapData.forEach(d => {
+      dataMap.set(d.date, d);
+    });
     
     // Create 53 weeks (columns)
     for (let week = 0; week < 53; week++) {
@@ -65,22 +70,25 @@ export function ActivityHeatmap() {
       
       // For each day of the week (Sunday = 0 to Saturday = 6) - rows
       for (let day = 0; day < 7; day++) {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + (week * 7) + day);
-        date.setHours(0, 0, 0, 0);
+        const currentDate = new Date(alignedStartDate);
+        currentDate.setDate(alignedStartDate.getDate() + (week * 7) + day);
+        currentDate.setHours(0, 0, 0, 0);
         
         // Only include dates up to today
-        if (date <= today) {
-          const dateStr = date.toISOString().split('T')[0];
+        if (currentDate <= today && currentDate >= alignedStartDate) {
+          const dateStr = currentDate.toISOString().split('T')[0];
           const cellData = dataMap.get(dateStr) || { date: dateStr, count: 0, level: 0 };
           weekData.push(cellData);
         } else {
-          // Empty cell for future dates
+          // Empty cell for future dates or before start
           weekData.push({ date: '', count: 0, level: 0 });
         }
       }
       
-      weeks.push(weekData);
+      // Only add week if it has at least one valid date
+      if (weekData.some(cell => cell.date)) {
+        weeks.push(weekData);
+      }
     }
     
     return weeks;
@@ -151,46 +159,53 @@ export function ActivityHeatmap() {
       <CardContent>
         <div className="space-y-4">
           {/* Heatmap Grid - GitHub Style */}
-          <div className="flex gap-1 overflow-x-auto pb-2">
-            <TooltipProvider>
-              {weeksData.map((week, weekIndex) => (
-                <div key={weekIndex} className="flex flex-col gap-1">
-                  {week.map((cell, dayIndex) => {
-                    if (!cell.date) {
-                      return (
-                        <div
-                          key={`${weekIndex}-${dayIndex}`}
-                          className="w-3 h-3 rounded-sm bg-transparent"
-                        />
-                      );
-                    }
-                    
-                    const isHovered = hoveredCell === cell.date;
-                    
-                    return (
-                      <Tooltip key={`${weekIndex}-${dayIndex}`}>
-                        <TooltipTrigger asChild>
+          {weeksData.length > 0 ? (
+            <div className="flex gap-1 overflow-x-auto pb-2">
+              <TooltipProvider>
+                {weeksData.map((week, weekIndex) => (
+                  <div key={weekIndex} className="flex flex-col gap-1">
+                    {week.map((cell, dayIndex) => {
+                      if (!cell.date) {
+                        return (
                           <div
-                            className={`w-3 h-3 rounded-sm cursor-pointer transition-all ${getColorForLevel(cell.level)} ${
-                              isHovered ? 'ring-2 ring-primary ring-offset-1 scale-110' : 'hover:ring-1 hover:ring-primary/50'
-                            }`}
-                            onMouseEnter={() => setHoveredCell(cell.date)}
-                            onMouseLeave={() => setHoveredCell(null)}
+                            key={`${weekIndex}-${dayIndex}`}
+                            className="w-3 h-3 rounded-sm bg-transparent"
                           />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <div className="text-sm">
-                            <div className="font-semibold">{getActivityDescription(cell.count)}</div>
-                            <div className="text-muted-foreground">{formatDate(cell.date)}</div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              ))}
-            </TooltipProvider>
-          </div>
+                        );
+                      }
+                      
+                      const isHovered = hoveredCell === cell.date;
+                      
+                      return (
+                        <Tooltip key={`${weekIndex}-${dayIndex}`}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={`w-3 h-3 rounded-sm cursor-pointer transition-all ${getColorForLevel(cell.level)} ${
+                                isHovered ? 'ring-2 ring-primary ring-offset-1 scale-110' : 'hover:ring-1 hover:ring-primary/50'
+                              }`}
+                              onMouseEnter={() => setHoveredCell(cell.date)}
+                              onMouseLeave={() => setHoveredCell(null)}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-sm">
+                              <div className="font-semibold">{getActivityDescription(cell.count)}</div>
+                              <div className="text-muted-foreground">{formatDate(cell.date)}</div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                ))}
+              </TooltipProvider>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No activity data yet. Start learning to see your activity heatmap!</p>
+            </div>
+          )}
 
           {/* Legend */}
           <div className="flex items-center justify-between text-xs text-muted-foreground">

@@ -19,6 +19,7 @@ import {
   type SkillRadarData,
 } from '@/services/quizResults';
 import { recordActivity } from '@/services/activityTracker';
+import { searchVideosForTopic, type YouTubeVideo } from '@/services/youtube';
 import {
   LineChart,
   Line,
@@ -74,6 +75,8 @@ export default function StudentPractice() {
   const [difficultyData, setDifficultyData] = useState<DifficultyDistribution | null>(null);
   const [skillData, setSkillData] = useState<SkillRadarData | null>(null);
   const [insights, setInsights] = useState<string[]>([]);
+  const [weakAreaVideos, setWeakAreaVideos] = useState<Map<string, YouTubeVideo[]>>(new Map());
+  const [loadingVideos, setLoadingVideos] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Record activity when viewing practice page
@@ -114,6 +117,42 @@ export default function StudentPractice() {
     // Generate insights
     const generatedInsights = generateInsights(perfMetrics, progress, weak, strong);
     setInsights(generatedInsights);
+
+    // Fetch YouTube videos for weak areas
+    fetchVideosForWeakAreas(weak);
+  };
+
+  const fetchVideosForWeakAreas = async (weakAreas: WeakArea[]) => {
+    // Fetch videos for top 6 weak areas
+    const topWeakAreas = weakAreas.slice(0, 6);
+    
+    for (const area of topWeakAreas) {
+      const key = `${area.subject}::${area.topic}`;
+      
+      // Skip if already loaded or loading
+      if (weakAreaVideos.has(key) || loadingVideos.has(key)) {
+        continue;
+      }
+
+      setLoadingVideos(prev => new Set(prev).add(key));
+
+      try {
+        const videos = await searchVideosForTopic(area.topic, area.subject, 3);
+        setWeakAreaVideos(prev => {
+          const newMap = new Map(prev);
+          newMap.set(key, videos);
+          return newMap;
+        });
+      } catch (error) {
+        console.error(`Error fetching videos for ${area.topic}:`, error);
+      } finally {
+        setLoadingVideos(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(key);
+          return newSet;
+        });
+      }
+    }
   };
 
   const generateInsights = (
@@ -496,43 +535,87 @@ export default function StudentPractice() {
                 <AlertCircle className="h-5 w-5 text-red-600" />
                 Weak Areas
               </CardTitle>
-              <CardDescription>Topics with accuracy below 60% - Focus on these!</CardDescription>
+              <CardDescription>Topics with accuracy below 60% - Focus on these! Watch suggested videos to improve.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {weakAreas.slice(0, 6).map((area, index) => (
-                  <Card key={index} className="border-red-200">
-                    <CardHeader>
-                      <CardTitle className="text-base">{area.topic}</CardTitle>
-                      <CardDescription>{area.subject}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Accuracy:</span>
-                          <Badge variant="destructive">{area.accuracy.toFixed(1)}%</Badge>
+                {weakAreas.slice(0, 6).map((area, index) => {
+                  const videoKey = `${area.subject}::${area.topic}`;
+                  const videos = weakAreaVideos.get(videoKey) || [];
+                  const isLoading = loadingVideos.has(videoKey);
+
+                  return (
+                    <Card key={index} className="border-red-200">
+                      <CardHeader>
+                        <CardTitle className="text-base">{area.topic}</CardTitle>
+                        <CardDescription>{area.subject}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">Accuracy:</span>
+                              <Badge variant="destructive">{area.accuracy.toFixed(1)}%</Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">Avg Time:</span>
+                              <span className="text-sm">{Math.round(area.averageTime)}s</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm text-muted-foreground">Attempts:</span>
+                              <span className="text-sm">{area.totalAttempts}</span>
+                            </div>
+                          </div>
+
+                          {/* Suggested YouTube Videos */}
+                          {isLoading && (
+                            <div className="text-xs text-muted-foreground">Loading videos...</div>
+                          )}
+                          {!isLoading && videos.length > 0 && (
+                            <div className="space-y-2 border-t pt-3">
+                              <div className="text-xs font-semibold text-muted-foreground mb-2">
+                                Suggested Videos:
+                              </div>
+                              {videos.map((video, vidIndex) => (
+                                <a
+                                  key={vidIndex}
+                                  href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex gap-2 p-2 rounded-lg border hover:bg-muted transition-colors group"
+                                >
+                                  <img
+                                    src={video.snippet.thumbnails.medium.url}
+                                    alt={video.snippet.title}
+                                    className="w-16 h-12 object-cover rounded flex-shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium line-clamp-2 group-hover:text-primary">
+                                      {video.snippet.title}
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground mt-1">
+                                      {video.snippet.channelTitle}
+                                    </div>
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full mt-2"
+                            onClick={() => navigate('/student/study-notes')}
+                          >
+                            <BookOpen className="h-4 w-4 mr-2" />
+                            Study Notes
+                          </Button>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Avg Time:</span>
-                          <span className="text-sm">{Math.round(area.averageTime)}s</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Attempts:</span>
-                          <span className="text-sm">{area.totalAttempts}</span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full mt-2"
-                          onClick={() => navigate('/student/study-notes')}
-                        >
-                          <BookOpen className="h-4 w-4 mr-2" />
-                          Study Notes
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
