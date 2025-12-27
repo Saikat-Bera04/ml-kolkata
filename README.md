@@ -1,4 +1,4 @@
-# Adapti-Learn: AI-Powered Adaptive Learning Platform
+# SkillHive: AI-Powered Adaptive Learning Platform
 
 An intelligent learning platform that adapts to each student's pace, identifies learning gaps, and provides personalized recommendations using AI and machine learning algorithms.
 
@@ -16,9 +16,9 @@ cd adapti-learn-spark-38-main
 npm install
 
 # Set up environment variables (see SETUP.md)
-# Adapti‑Learn — AI‑Powered Adaptive Learning & Career Assistant
+# SkillHive — AI‑Powered Adaptive Learning & Career Assistant
 
-Adapti‑Learn is an AI-first ed‑tech prototype that gives students hyper‑personalized learning guidance and career recommendations. It combines dynamic quiz generation, adaptive practice, explainable resume analysis, and curated learning resources — all tracked and iterated with Weights & Biases (W&B) and powered by Google Gemini for reasoning and generation.
+SkillHive is an AI-first ed‑tech prototype that gives students hyper‑personalized learning guidance and career recommendations. It combines dynamic quiz generation, adaptive practice, explainable resume analysis, and curated learning resources — all tracked and iterated with Weights & Biases (W&B) and powered by Google Gemini for reasoning and generation.
 
 This README explains the system architecture, how Gemini and W&B are used, security and reproducibility practices, and how to run and test the project locally.
 
@@ -52,7 +52,7 @@ This README explains the system architecture, how Gemini and W&B are used, secur
 
 ## One-line Student Benefit
 
-Adapti‑Learn transforms vague career and study advice into concrete, verifiable guidance: students receive ranked job matches with explainable reasons, prioritized improvement steps for resumes and skills, and adaptive learning plans that update after every interaction—saving time and improving outcomes.
+SkillHive transforms vague career and study advice into concrete, verifiable guidance: students receive ranked job matches with explainable reasons, prioritized improvement steps for resumes and skills, and adaptive learning plans that update after every interaction—saving time and improving outcomes.
 
 ---
 
@@ -199,11 +199,5 @@ This keeps the codebase focused, secure, and easier to audit.
 This project is MIT licensed — see the `LICENSE` file.
 
 ---
-
-If you'd like, I can also:
-- Add an example server proxy (small Express/Node example) that safely exposes a `/api/gemini` endpoint that calls Gemini using `process.env.GEMINI_API_KEY` (recommended for production), or
-- Draft a short `how-to-run` demo script that includes W&B run creation and a list of artifacts to attach to your submission.
-
-Which of these would you like me to add next?
 
 
