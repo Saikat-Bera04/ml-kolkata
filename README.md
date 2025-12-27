@@ -104,11 +104,7 @@ const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models
 If you must run locally without a server proxy for quick demos, use a local environment and never commit the `.env` file. In production, implement a small server endpoint that accepts requests from the frontend and then calls Gemini using the key from `process.env`.
 
 Model constraints (enforced in the repo):
-- ✅ Gemini API: ALLOWED (mandatory)
-- ❌ LLaMA 3: REMOVED
-- ❌ OpenRouter: REMOVED
-- ❌ Hardcoded API keys: STRICTLY FORBIDDEN
-
+- Gemini API
 ---
 
 ## Weights & Biases (W&B) Integration
