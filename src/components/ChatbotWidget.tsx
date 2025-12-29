@@ -40,7 +40,7 @@ const introMessage: ChatMessage = {
 };
 
 export function ChatbotWidget() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -178,6 +178,8 @@ export function ChatbotWidget() {
   );
 
   const handleToggle = () => setIsOpen((prev) => !prev);
+
+  if (loading || !user) return null;
 
   return (
     <>
