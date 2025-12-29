@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, MessageCircle, X, ArrowDown, FileQuestion } from 'lucide-react';
@@ -41,6 +42,18 @@ const introMessage: ChatMessage = {
 
 export function ChatbotWidget() {
   const { user, loading } = useAuth();
+  const location = useLocation();
+
+  const hiddenPaths = [
+    '/student/login',
+    '/student/signup',
+    '/mentor/login',
+    '/mentor/signup',
+    '/login',
+    '/signup'
+  ];
+
+  const isHidden = hiddenPaths.includes(location.pathname);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -179,7 +192,7 @@ export function ChatbotWidget() {
 
   const handleToggle = () => setIsOpen((prev) => !prev);
 
-  if (loading || !user) return null;
+  if (loading || !user || isHidden) return null;
 
   return (
     <>

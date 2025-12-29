@@ -23,8 +23,8 @@ export default function StudentLearning() {
   const [isVideoDialogOpen, setIsVideoDialogOpen] = useState(false);
 
   const streamData = selectedStream ? subjectData[selectedStream] : null;
-  const yearData = streamData && selectedYear 
-    ? streamData.years.find(y => y.year === selectedYear) 
+  const yearData = streamData && selectedYear
+    ? streamData.years.find(y => y.year === selectedYear)
     : null;
   const semesterData = yearData && selectedSemester
     ? yearData.semesters.find(s => s.number === selectedSemester)
@@ -95,7 +95,7 @@ export default function StudentLearning() {
       // Normalize error message
       let msg = '';
       if (typeof error === 'string') msg = error;
-  else if (error && typeof error === 'object' && 'message' in error) msg = String((error as { message?: unknown }).message ?? '');
+      else if (error && typeof error === 'object' && 'message' in error) msg = String((error as { message?: unknown }).message ?? '');
       else msg = String(error);
 
       // If quota exceeded, try to fallback to channel uploads if configured
@@ -118,10 +118,10 @@ export default function StudentLearning() {
   };
 
   const handleVideoClick = (video: YouTubeVideo) => {
-    recordActivity('video_watched', { 
-      videoId: video.id.videoId, 
+    recordActivity('video_watched', {
+      videoId: video.id.videoId,
       title: video.snippet.title,
-      subject: selectedSubject?.name 
+      subject: selectedSubject?.name
     });
     window.dispatchEvent(new CustomEvent('activity-updated'));
     setSelectedVideo(video);
@@ -153,7 +153,7 @@ export default function StudentLearning() {
       </div>
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
         {Object.keys(subjectData).map((stream) => (
-          <Card 
+          <Card
             key={stream}
             className="cursor-pointer hover:shadow-lg transition-shadow"
             onClick={() => handleStreamSelect(stream)}
@@ -337,7 +337,7 @@ export default function StudentLearning() {
   return (
     <div className="min-h-screen bg-background">
       <StudentNavbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         {/* Breadcrumb Navigation */}
         {currentView !== 'stream' && (

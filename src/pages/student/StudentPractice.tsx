@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { StudentNavbar } from '@/components/StudentNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
+import {
   getPerformanceMetrics,
   getProgressOverTime,
   getSubjectPerformance,
@@ -40,12 +40,12 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Target, 
-  Clock, 
-  Award, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Clock,
+  Award,
   AlertCircle,
   BookOpen,
   Zap,
@@ -83,16 +83,16 @@ export default function StudentPractice() {
     // Record activity when viewing practice page
     recordActivity('practice_viewed');
     window.dispatchEvent(new CustomEvent('activity-updated'));
-    
+
     loadAnalytics();
-    
+
     // Listen for quiz completion events
     const handleQuizComplete = () => {
       loadAnalytics();
     };
-    
+
     window.addEventListener('quiz-completed', handleQuizComplete);
-    
+
     return () => {
       window.removeEventListener('quiz-completed', handleQuizComplete);
     };
@@ -126,11 +126,11 @@ export default function StudentPractice() {
   const fetchVideosForWeakAreas = async (weakAreas: WeakArea[]) => {
     // Fetch videos for top 6 weak areas
     const topWeakAreas = weakAreas.slice(0, 6);
-    
+
     // Fetch videos in parallel for better performance
     const videoPromises = topWeakAreas.map(async (area) => {
       const key = `${area.subject}::${area.topic}`;
-      
+
       // Skip if already loaded or loading
       if (weakAreaVideos.has(key) || loadingVideos.has(key)) {
         return;
@@ -141,7 +141,7 @@ export default function StudentPractice() {
       try {
         console.log(`Fetching YouTube videos for weak area: ${area.topic} (${area.subject})`);
         const videos = await searchVideosForTopic(area.topic, area.subject, 5); // Get 5 videos per topic
-        
+
         if (videos.length > 0) {
           console.log(`Successfully fetched ${videos.length} videos for ${area.topic}`);
           setWeakAreaVideos(prev => {
@@ -267,7 +267,7 @@ export default function StudentPractice() {
   return (
     <div className="min-h-screen bg-background">
       <StudentNavbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">

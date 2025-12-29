@@ -10,11 +10,11 @@ import { useNavigate } from 'react-router-dom';
 import { QuizGenerator } from '@/components/QuizGenerator';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { getActivityStreak, recordActivity, getTotalActivityCount } from '@/services/activityTracker';
-import { 
-  analyzeLearnerPerformance, 
+import {
+  analyzeLearnerPerformance,
   getRecommendedVideos,
   getSubjectRecommendedVideos,
-  type AdaptiveLearningInsights 
+  type AdaptiveLearningInsights
 } from '@/services/personalizedRecommendations';
 import { getWeakAreas, getSubjectPerformance, getQuizResults } from '@/services/quizResults';
 import { type YouTubeVideo } from '@/services/youtube';
@@ -22,10 +22,10 @@ import { youtubeQueue } from '@/services/youtubeQueue';
 import { supabase } from '@/integrations/supabase/client';
 import { getTodayGoals, addGoal, toggleGoal, deleteGoal, createGoalFromSession, type Goal } from '@/services/goals';
 import { getUpcomingSessions, getSessionsByDay, type DayOfWeek } from '@/services/timetable';
-import { 
-  Target, 
-  Clock, 
-  Award, 
+import {
+  Target,
+  Clock,
+  Award,
   AlertCircle,
   BookOpen,
   Zap,
@@ -61,14 +61,14 @@ export default function StudentDashboard() {
     // Load user profile to get name
     const loadUserProfile = async () => {
       if (!user) return;
-      
+
       try {
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('id', user.id)
           .single();
-        
+
         if (profile?.full_name) {
           setUserName(profile.full_name.split(' ')[0] || 'Student');
         } else if (user?.user_metadata?.full_name) {
@@ -82,31 +82,31 @@ export default function StudentDashboard() {
     // Load today's goals from storage and sync with timetable
     const loadTodayGoals = async () => {
       if (!user) return;
-      
+
       try {
         const storedGoals = getTodayGoals();
         const todayDay: DayOfWeek = (() => {
           const dayNames: DayOfWeek[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
           return dayNames[new Date().getDay()];
         })();
-        
+
         // Get today's timetable sessions
         const todaySessions = await getSessionsByDay(user.id, todayDay);
-        
+
         // Create goals for timetable sessions that don't have goals yet
         const sessionGoalIds = new Set(storedGoals.filter(g => g.timetableSessionId).map(g => g.timetableSessionId));
         const newGoals: Goal[] = [];
-        
+
         for (const session of todaySessions) {
           if (session.id && !sessionGoalIds.has(session.id)) {
             const goal = createGoalFromSession(session);
             newGoals.push(goal);
           }
         }
-        
+
         // Merge stored goals with new goals from sessions
         const allGoals = [...storedGoals, ...newGoals];
-        
+
         // Update goals that are linked to sessions to sync completion status
         const completedSessions = JSON.parse(localStorage.getItem('completed_sessions') || '[]');
         const syncedGoals = allGoals.map(goal => {
@@ -115,7 +115,7 @@ export default function StudentDashboard() {
           }
           return goal;
         });
-        
+
         setTodayGoals(syncedGoals);
       } catch (error) {
         console.error('Error loading today\'s goals:', error);
@@ -132,45 +132,45 @@ export default function StudentDashboard() {
       recordActivity('practice_viewed'); // Using practice_viewed as general activity
       localStorage.setItem(`dashboard_view_${today}`, 'true');
     }
-    
+
     // Update streak from activity tracker
     const currentStreak = getActivityStreak();
     setStreak(currentStreak);
-    
+
     // Load user profile and goals
     loadUserProfile();
     loadTodayGoals();
-    
+
     // Load personalized insights
     loadPersonalizedInsights();
-    
+
     // Listen for timetable updates to sync goals
     const handleTimetableUpdate = () => {
       loadTodayGoals();
     };
-    
+
     // Listen for goals updates
     const handleGoalsUpdate = () => {
       loadTodayGoals();
     };
-    
+
     // Listen for activity updates
     const handleActivityUpdate = () => {
       setStreak(getActivityStreak());
       setRefreshTrigger(prev => prev + 1); // Trigger recalculation of XP
     };
-    
+
     // Listen for quiz completion to refresh recommendations
     const handleQuizComplete = () => {
       loadPersonalizedInsights();
       setRefreshTrigger(prev => prev + 1); // Trigger recalculation of XP
     };
-    
+
     window.addEventListener('timetable-updated', handleTimetableUpdate);
     window.addEventListener('goals-updated', handleGoalsUpdate);
     window.addEventListener('activity-updated', handleActivityUpdate);
     window.addEventListener('quiz-completed', handleQuizComplete);
-    
+
     return () => {
       window.removeEventListener('timetable-updated', handleTimetableUpdate);
       window.removeEventListener('goals-updated', handleGoalsUpdate);
@@ -236,7 +236,7 @@ export default function StudentDashboard() {
   const handleAddGoal = async () => {
     const trimmedText = newGoalText.trim();
     if (!trimmedText) return;
-    
+
     try {
       const newGoal = await addGoal(trimmedText, user?.id);
       setTodayGoals(prev => [...prev, newGoal]);
@@ -253,9 +253,9 @@ export default function StudentDashboard() {
   const handleToggleGoal = async (goalId: string) => {
     try {
       await toggleGoal(goalId);
-      setTodayGoals(prev => 
-        prev.map(goal => 
-          goal.id === goalId 
+      setTodayGoals(prev =>
+        prev.map(goal =>
+          goal.id === goalId
             ? { ...goal, completed: !goal.completed, completedAt: !goal.completed ? new Date().toISOString() : undefined }
             : goal
         )
@@ -282,7 +282,7 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <StudentNavbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -352,8 +352,8 @@ export default function StudentDashboard() {
                         {goal.startTime && goal.endTime && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                             <Clock className="w-3 h-3" />
-                            {goal.startTime === '00:00' && goal.endTime === '23:59' 
-                              ? 'All day' 
+                            {goal.startTime === '00:00' && goal.endTime === '23:59'
+                              ? 'All day'
                               : `${goal.startTime} - ${goal.endTime}`}
                           </span>
                         )}
@@ -373,9 +373,9 @@ export default function StudentDashboard() {
                   No goals set for today. Add one below to get started!
                 </div>
               )}
-              
+
               {isAddingGoal ? (
-                <form 
+                <form
                   className="flex gap-2 pt-2 border-t"
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -403,10 +403,10 @@ export default function StudentDashboard() {
                   <Button type="submit" size="sm" disabled={!newGoalText.trim()}>
                     Add
                   </Button>
-                  <Button 
+                  <Button
                     type="button"
-                    size="sm" 
-                    variant="ghost" 
+                    size="sm"
+                    variant="ghost"
                     onClick={(e) => {
                       e.preventDefault();
                       setIsAddingGoal(false);
@@ -533,25 +533,25 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-2">
-                <button 
+                <button
                   onClick={() => setShowQuiz(true)}
                   className="p-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
                 >
                   Take Quiz
                 </button>
-                <button 
+                <button
                   onClick={() => navigate('/student/learning')}
                   className="p-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
                 >
                   Watch Video
                 </button>
-                <button 
+                <button
                   onClick={() => navigate('/student/study-notes')}
                   className="p-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
                 >
                   Study Notes
                 </button>
-                <button 
+                <button
                   onClick={() => navigate('/student/practice')}
                   className="p-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
                 >
@@ -580,11 +580,10 @@ export default function StudentDashboard() {
                   {insights.recommendations.slice(0, 4).map((rec, index) => (
                     <div
                       key={index}
-                      className={`p-4 rounded-lg border ${
-                        rec.priority === 'high'
+                      className={`p-4 rounded-lg border ${rec.priority === 'high'
                           ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20'
                           : 'border-border bg-accent/5'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -646,23 +645,23 @@ export default function StudentDashboard() {
                     <PlayCircle className="h-5 w-5" />
                     Recommended Videos for Weak Areas
                   </CardTitle>
-                <CardDescription>
-                  Personalized video suggestions to improve your weak topics
-                  {videoQueueStatus && (
-                    <span className="ml-2 text-xs text-muted-foreground">({videoQueueStatus})</span>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingVideos ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-                    <p className="text-sm text-muted-foreground">{videoQueueStatus || 'Loading recommended videos...'}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Processing one request at a time to save API quota
-                    </p>
-                  </div>
-                ) : (
+                  <CardDescription>
+                    Personalized video suggestions to improve your weak topics
+                    {videoQueueStatus && (
+                      <span className="ml-2 text-xs text-muted-foreground">({videoQueueStatus})</span>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingVideos ? (
+                    <div className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                      <p className="text-sm text-muted-foreground">{videoQueueStatus || 'Loading recommended videos...'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Processing one request at a time to save API quota
+                      </p>
+                    </div>
+                  ) : (
                     <div className="space-y-6">
                       {Array.from(recommendedVideos.entries()).map(([key, videos]) => {
                         const [subject, topic] = key.split('::');
@@ -696,8 +695,8 @@ export default function StudentDashboard() {
                                         rel="noopener noreferrer"
                                         className="text-white hover:scale-110 transition-transform"
                                         onClick={() => {
-                                          recordActivity('video_watched', { 
-                                            videoId: video.id.videoId, 
+                                          recordActivity('video_watched', {
+                                            videoId: video.id.videoId,
                                             title: video.snippet.title,
                                             source: 'dashboard_weak_area'
                                           });
@@ -778,8 +777,8 @@ export default function StudentDashboard() {
                                     rel="noopener noreferrer"
                                     className="text-white hover:scale-110 transition-transform"
                                     onClick={() => {
-                                      recordActivity('video_watched', { 
-                                        videoId: video.id.videoId, 
+                                      recordActivity('video_watched', {
+                                        videoId: video.id.videoId,
                                         title: video.snippet.title,
                                         subject: subject,
                                         source: 'dashboard_focus_subject'

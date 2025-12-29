@@ -28,7 +28,7 @@ export default function StudentJobs() {
   const [analysisResult, setAnalysisResult] = useState<ResumeAnalysisResult | null>(null);
   const [jobRecommendations, setJobRecommendations] = useState<JobRecommendation[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
-  
+
   const [searchParams, setSearchParams] = useState<JobSearchParams>({
     field: '',
     location: '',
@@ -36,7 +36,7 @@ export default function StudentJobs() {
     experienceLevel: '',
     workType: '',
   });
-  
+
   const [jobs, setJobs] = useState<JobResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
@@ -60,7 +60,7 @@ export default function StudentJobs() {
 
     setLoading(true);
     setCurrentPage(1);
-    
+
     try {
       const result = await searchJobs(searchParams, 1);
       setJobs(result.jobs);
@@ -76,7 +76,7 @@ export default function StudentJobs() {
   const handleLoadMore = async () => {
     const nextPage = currentPage + 1;
     setLoading(true);
-    
+
     try {
       const result = await searchJobs(searchParams, (nextPage - 1) * 10 + 1);
       setJobs([...jobs, ...result.jobs]);
@@ -93,11 +93,11 @@ export default function StudentJobs() {
       ...job,
       savedAt: new Date(),
     };
-    
+
     const updated = [...savedJobs, savedJob];
     setSavedJobs(updated);
     localStorage.setItem('savedJobs', JSON.stringify(updated));
-    
+
     // Record activity
     recordActivity('job_saved', { jobTitle: job.title, company: extractCompanyName(job) });
     window.dispatchEvent(new CustomEvent('activity-updated'));
@@ -122,11 +122,11 @@ export default function StudentJobs() {
   const handleFormSubmit = async (data: JobApplicationData) => {
     setAnalyzing(true);
     setApplicationData(data);
-    
+
     try {
       // Build resume text from form data
       let resumeText = '';
-      
+
       if (data.resumeText) {
         resumeText = data.resumeText;
       } else if (data.resumeFile) {
@@ -155,21 +155,21 @@ ${data.certifications.map(cert => `${cert.name} from ${cert.issuer} (${cert.date
 Languages: ${data.languages.join(', ')}
         `.trim();
       }
-      
+
       // Analyze resume and get job recommendations
       const result = await analyzeResumeAndGetJobs(
         data.resumeFile,
         resumeText,
         data.location
       );
-      
+
       setAnalysisResult(result);
       setJobRecommendations(result.jobRecommendations);
       setFormSubmitted(true);
       setShowForm(false);
-      
+
       // Record activity
-      recordActivity('resume_analyzed', { 
+      recordActivity('resume_analyzed', {
         hasResumeFile: !!data.resumeFile,
         skillsCount: data.skills.length,
         experienceCount: data.experience.length
@@ -335,13 +335,13 @@ Languages: ${data.languages.join(', ')}
   return (
     <div className="min-h-screen bg-background">
       <StudentNavbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Job Search & Recommendations</h1>
           <p className="text-muted-foreground">
-            {showForm 
+            {showForm
               ? 'Fill out your profile to get personalized job recommendations'
               : 'AI-powered job recommendations based on your resume'
             }
@@ -402,7 +402,7 @@ Languages: ${data.languages.join(', ')}
                   <h4 className="font-semibold mb-2">Summary</h4>
                   <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
                 </div>
-                
+
                 {analysisResult.strengths.length > 0 && (
                   <div>
                     <h4 className="font-semibold mb-2 flex items-center gap-2">
@@ -486,7 +486,7 @@ Languages: ${data.languages.join(', ')}
                       const job = rec.job;
                       const companyName = extractCompanyName(job);
                       const applyLink = job.apply_link || job.link || '#';
-                      
+
                       return (
                         <Card key={index} className="hover:shadow-lg transition-shadow">
                           <CardHeader>
@@ -494,7 +494,7 @@ Languages: ${data.languages.join(', ')}
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
                                   <CardTitle className="text-lg">{job.title}</CardTitle>
-                                  <Badge 
+                                  <Badge
                                     variant={rec.matchScore >= 80 ? "default" : rec.matchScore >= 60 ? "secondary" : "outline"}
                                     className="flex items-center gap-1"
                                   >
@@ -578,7 +578,7 @@ Languages: ${data.languages.join(', ')}
           </div>
         )}
 
-  <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList>
             <TabsTrigger value="search">Search Jobs</TabsTrigger>
             <TabsTrigger value="saved">Saved Jobs ({savedJobs.length})</TabsTrigger>
