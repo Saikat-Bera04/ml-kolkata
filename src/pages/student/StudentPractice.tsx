@@ -393,6 +393,29 @@ export default function StudentPractice() {
           </Card>
         </div>
 
+        {/* AI Insights */}
+        {insights.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="h-5 w-5 text-yellow-600" />
+                Personalized Insights
+              </CardTitle>
+              <CardDescription>AI-powered recommendations based on your performance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {insights.map((insight, index) => (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                    <Zap className="h-5 w-5 text-primary mt-0.5" />
+                    <p className="text-sm">{insight}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Progress Over Time - Line Chart */}
         {progressData.length > 0 && (
           <Card className="mb-6">
@@ -425,13 +448,13 @@ export default function StudentPractice() {
               <CardDescription>Average score, attempts, and accuracy by subject</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={subjectData}>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={subjectData} margin={{ bottom: 80 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="subject" angle={-45} textAnchor="end" height={100} />
                   <YAxis />
                   <Tooltip />
-                  <Legend />
+                  <Legend verticalAlign="top" height={36} />
                   <Bar dataKey="averageScore" fill="#3b82f6" name="Avg Score" />
                   <Bar dataKey="attempts" fill="#8b5cf6" name="Attempts" />
                   <Bar dataKey="accuracy" fill="#10b981" name="Accuracy %" />
@@ -685,29 +708,6 @@ export default function StudentPractice() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* AI Insights */}
-        {insights.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5 text-yellow-600" />
-                Personalized Insights
-              </CardTitle>
-              <CardDescription>AI-powered recommendations based on your performance</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {insights.map((insight, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                    <Zap className="h-5 w-5 text-primary mt-0.5" />
-                    <p className="text-sm">{insight}</p>
-                  </div>
                 ))}
               </div>
             </CardContent>

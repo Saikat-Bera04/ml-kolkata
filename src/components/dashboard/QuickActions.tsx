@@ -27,7 +27,7 @@ export function QuickActions({ onTakeQuiz }: QuickActionsProps) {
             onClick: () => navigate('/student/study-notes'),
         },
         {
-            title: 'Practice',
+            title: 'Practice Analytics',
             icon: <Target className="w-5 h-5" />,
             onClick: () => navigate('/student/practice'),
         }
