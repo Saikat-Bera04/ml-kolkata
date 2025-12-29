@@ -22,13 +22,7 @@ export function StudentNavbar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
 
-  const navItems = [
-    { label: 'Dashboard', path: '/student/dashboard' },
-    { label: 'About', path: '/student/about' },
-    { label: 'Podcasts', path: '/student/podcasts' },
-    // Jobs will be a dropdown with quick links
-    { label: 'Timetable', path: '/student/timetable' },
-  ];
+
 
   // loadNotifications stable via useCallback-like definition inside effect
   useEffect(() => {
@@ -91,7 +85,13 @@ export function StudentNavbar() {
 
           {/* Center: Navigation Links */}
           <div className="flex items-center gap-6">
-            {/* Learning Dropdown */}
+            <button
+              onClick={() => navigate('/student/dashboard')}
+              className="text-sm font-medium hover:text-primary-foreground/80 transition-colors"
+            >
+              Dashboard
+            </button>
+
             <button
               onClick={() => navigate('/student/learning')}
               className="text-sm font-medium hover:text-primary-foreground/80 transition-colors"
@@ -99,16 +99,19 @@ export function StudentNavbar() {
               Learning
             </button>
 
-            {/* Other Navigation Links */}
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                className="text-sm font-medium hover:text-primary-foreground/80 transition-colors"
-              >
-                {item.label}
-              </button>
-            ))}
+            <button
+              onClick={() => navigate('/student/timetable')}
+              className="text-sm font-medium hover:text-primary-foreground/80 transition-colors"
+            >
+              Timetable
+            </button>
+
+            <button
+              onClick={() => navigate('/student/podcasts')}
+              className="text-sm font-medium hover:text-primary-foreground/80 transition-colors"
+            >
+              Podcasts
+            </button>
 
             {/* Jobs Dropdown */}
             <DropdownMenu>
@@ -119,9 +122,7 @@ export function StudentNavbar() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => navigate('/student/jobs#search')}>
-                  Search Jobs
-                </DropdownMenuItem>
+
                 <DropdownMenuItem onClick={() => navigate('/student/jobs#saved')}>
                   Saved Jobs
                 </DropdownMenuItem>
@@ -202,14 +203,26 @@ export function StudentNavbar() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Support Button */}
-            <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
-              size="sm"
-              onClick={() => setSupportOpen(true)}
-            >
-              ⚡ Support
-            </Button>
+            {/* Support & About Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white gap-2"
+                  size="sm"
+                >
+                  Support
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setSupportOpen(true)}>
+                  Contact Support
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/student/about')}>
+                  About
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Profile Dropdown */}
             <DropdownMenu>

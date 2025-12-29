@@ -109,7 +109,7 @@ export function SupportModal({ open, onOpenChange }: SupportModalProps) {
                 <div className="flex items-center justify-between p-4 bg-accent rounded-lg">
                   <div>
                     <p className="text-2xl font-bold">{SUPPORT_PHONE}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <p className="text-sm text-gray-700 dark:text-gray-400 mt-1">
                       Available 24/7 for urgent assistance
                     </p>
                   </div>
