@@ -32,7 +32,12 @@ export function GoalList({
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Today's Goals</CardTitle>
+                        <div className="flex items-baseline gap-2">
+                            <CardTitle>Today's Goals</CardTitle>
+                            <span className="text-xs text-muted-foreground font-normal">
+                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                        </div>
                         <CardDescription>
                             {completedCount} of {goals.length} completed
                         </CardDescription>

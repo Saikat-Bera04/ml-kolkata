@@ -1,4 +1,4 @@
-export type NoteCategory = 'college' | 'competitive';
+export type NoteCategory = 'college' | 'competitive' | 'personal';
 export type NoteStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface NoteSource {
