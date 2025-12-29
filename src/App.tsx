@@ -32,141 +32,145 @@ import MentorDashboard from "./pages/mentor/MentorDashboard";
 import MentorStudents from "./pages/mentor/MentorStudents";
 import StudentDetailReport from "./pages/mentor/StudentDetailReport";
 
+import { ThemeProvider } from "./components/theme-provider";
+
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <>
-            <ChatbotWidget />
-            <Routes>
-              <Route path="/" element={<Index />} />
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <>
+              <ChatbotWidget />
+              <Routes>
+                <Route path="/" element={<Index />} />
 
-              {/* Student Routes */}
-              <Route path="/student/signup" element={<StudentSignup />} />
-              <Route path="/student/login" element={<StudentLogin />} />
-              <Route
-                path="/student/dashboard"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/about"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentAbout />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/learning"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentLearning />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/competitive-exams"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentCompetitiveExams />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/study-notes"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentStudyNotes />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/practice"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentPractice />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/podcasts"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentPodcasts />
-                  </ProtectedRoute>
-                }
-              />
-              {/* Make jobs public so navbar click works even when not signed in */}
-              <Route path="/student/jobs" element={<StudentJobs />} />
-              <Route
-                path="/student/timetable"
-                element={
-                  <ProtectedRoute allowedRoles={["student"]}>
-                    <StudentTimetable />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/student/profile"
-                element={
-                  <ProtectedRoute allowedRoles={["student", "mentor"]}>
-                    <StudentProfile />
-                  </ProtectedRoute>
-                }
-              />
-              <Route 
-                path="/student/settings" 
-                element={
-                  <ProtectedRoute allowedRoles={['student', 'mentor']}>
-                    <StudentSettings />
-                  </ProtectedRoute>
-                } 
-              />
+                {/* Student Routes */}
+                <Route path="/student/signup" element={<StudentSignup />} />
+                <Route path="/student/login" element={<StudentLogin />} />
+                <Route
+                  path="/student/dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/about"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentAbout />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/learning"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentLearning />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/competitive-exams"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentCompetitiveExams />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/study-notes"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentStudyNotes />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/practice"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentPractice />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/podcasts"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentPodcasts />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Make jobs public so navbar click works even when not signed in */}
+                <Route path="/student/jobs" element={<StudentJobs />} />
+                <Route
+                  path="/student/timetable"
+                  element={
+                    <ProtectedRoute allowedRoles={["student"]}>
+                      <StudentTimetable />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/profile"
+                  element={
+                    <ProtectedRoute allowedRoles={["student", "mentor"]}>
+                      <StudentProfile />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/student/settings"
+                  element={
+                    <ProtectedRoute allowedRoles={['student', 'mentor']}>
+                      <StudentSettings />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* Mentor Routes */}
-              <Route path="/mentor/signup" element={<MentorSignup />} />
-              <Route path="/mentor/login" element={<MentorLogin />} />
-              <Route 
-                path="/mentor/dashboard" 
-                element={
-                  <ProtectedRoute allowedRoles={['mentor']}>
-                    <MentorDashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/mentor/students" 
-                element={
-                  <ProtectedRoute allowedRoles={['mentor']}>
-                    <MentorStudents />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/mentor/students/:studentId" 
-                element={
-                  <ProtectedRoute allowedRoles={['mentor']}>
-                    <StudentDetailReport />
-                  </ProtectedRoute>
-                } 
-              />
+                {/* Mentor Routes */}
+                <Route path="/mentor/signup" element={<MentorSignup />} />
+                <Route path="/mentor/login" element={<MentorLogin />} />
+                <Route
+                  path="/mentor/dashboard"
+                  element={
+                    <ProtectedRoute allowedRoles={['mentor']}>
+                      <MentorDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/mentor/students"
+                  element={
+                    <ProtectedRoute allowedRoles={['mentor']}>
+                      <MentorStudents />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/mentor/students/:studentId"
+                  element={
+                    <ProtectedRoute allowedRoles={['mentor']}>
+                      <StudentDetailReport />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* 404 Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+                {/* 404 Route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
