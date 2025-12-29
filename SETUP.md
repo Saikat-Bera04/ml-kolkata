@@ -97,7 +97,7 @@ npm run server:audio
 
 ## Verification
 
-1. **Frontend**: Open `http://localhost:8080`.
+1. **Frontend**: Open `http://localhost:8080` (or your local port).
 2. **Login**: Create a student account and log in.
 3. **Resume Analysis**: Go to **Jobs**, upload a PDF resume. It should extract text and show recommendations.
 4. **Podcasts**: Go to **Podcasts**, paste a YouTube link (e.g., a TED Talk). Click convert.

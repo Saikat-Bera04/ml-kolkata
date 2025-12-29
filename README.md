@@ -2,7 +2,7 @@
 
 SkillHive is an intelligent learning platform that adapts to each student's pace, identifies learning gaps, and provides personalized recommendations using AI. It combines dynamic quiz generation, adaptive practice, explainable resume analysis, and a focused learning environment.
 
-![SkillHive Dashboard](https://via.placeholder.com/800x400?text=SkillHive+Dashboard+Preview)
+![SkillHive Landing Page](./public/landing-page-preview.png)
 
 ## Key Features
 
