@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function StudentNavbar() {
   const navigate = useNavigate();
@@ -131,8 +132,10 @@ export function StudentNavbar() {
             </DropdownMenu>
           </div>
 
-          {/* Right: Notifications, Support, Profile */}
+          {/* Right: Theme Toggle, Notifications, Support, Profile */}
           <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <ThemeToggle />
             {/* Notifications */}
             <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
               <DropdownMenuTrigger asChild>

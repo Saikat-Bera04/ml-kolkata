@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function MentorNavbar() {
   const navigate = useNavigate();
@@ -44,12 +45,15 @@ export function MentorNavbar() {
             ))}
           </div>
 
-          {/* Right: Notifications, Support, Profile */}
+          {/* Right: Theme Toggle, Notifications, Support, Profile */}
           <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
             {/* Notifications */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="text-primary-foreground hover:bg-primary/90 relative"
             >
               <Bell className="h-5 w-5" />
@@ -59,7 +63,7 @@ export function MentorNavbar() {
             </Button>
 
             {/* Support Button */}
-            <Button 
+            <Button
               className="bg-green-600 hover:bg-green-700 text-white"
               size="sm"
               onClick={() => setSupportOpen(true)}
@@ -70,9 +74,9 @@ export function MentorNavbar() {
             {/* Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="text-primary-foreground hover:bg-primary/90 rounded-full"
                 >
                   <User className="h-5 w-5" />

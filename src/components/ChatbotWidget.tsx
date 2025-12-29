@@ -45,6 +45,7 @@ export function ChatbotWidget() {
   const location = useLocation();
 
   const hiddenPaths = [
+    '/',
     '/student/login',
     '/student/signup',
     '/mentor/login',
