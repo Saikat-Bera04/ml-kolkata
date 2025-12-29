@@ -1,4 +1,4 @@
-import { Bell, User, Mic, ChevronDown } from 'lucide-react';
+import { Bell, User, GraduationCap, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -80,35 +80,24 @@ export function StudentNavbar() {
     <nav className="bg-primary text-primary-foreground">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14">
-          {/* Left: Microphone Icon */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-primary-foreground hover:bg-primary/90"
-          >
-            <Mic className="h-5 w-5" />
-          </Button>
+          {/* Left: Brand Logo with Scholar Hat */}
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/student/dashboard')}>
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg">
+              <GraduationCap className="text-white" size={20} />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-white">SkillHive</span>
+          </div>
 
           {/* Center: Navigation Links */}
           <div className="flex items-center gap-6">
             {/* Learning Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="text-sm font-medium hover:text-primary-foreground/80 transition-colors flex items-center gap-1">
-                  Learning
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => navigate('/student/learning')}>
-                  Regular Learning
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/student/competitive-exams')}>
-                  Competitive Exams
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            
+            <button
+              onClick={() => navigate('/student/learning')}
+              className="text-sm font-medium hover:text-primary-foreground/80 transition-colors"
+            >
+              Learning
+            </button>
+
             {/* Other Navigation Links */}
             {navItems.map((item) => (
               <button
@@ -147,9 +136,9 @@ export function StudentNavbar() {
             {/* Notifications */}
             <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="text-primary-foreground hover:bg-primary/90 relative"
                 >
                   <Bell className="h-5 w-5" />
@@ -184,9 +173,8 @@ export function StudentNavbar() {
                       {notifications.map((notification) => (
                         <div
                           key={notification.id}
-                          className={`p-3 cursor-pointer hover:bg-accent transition-colors ${
-                            !notification.read ? 'bg-accent/50' : ''
-                          }`}
+                          className={`p-3 cursor-pointer hover:bg-accent transition-colors ${!notification.read ? 'bg-accent/50' : ''
+                            }`}
                           onClick={() => handleNotificationClick(notification)}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -212,7 +200,7 @@ export function StudentNavbar() {
             </DropdownMenu>
 
             {/* Support Button */}
-            <Button 
+            <Button
               className="bg-green-600 hover:bg-green-700 text-white"
               size="sm"
               onClick={() => setSupportOpen(true)}
@@ -223,9 +211,9 @@ export function StudentNavbar() {
             {/* Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="text-primary-foreground hover:bg-primary/90 rounded-full"
                 >
                   <User className="h-5 w-5" />
