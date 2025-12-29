@@ -159,5 +159,18 @@ export const podcastSections: PodcastSection[] = [
     ],
     color: 'orange',
   },
+  {
+    id: 'time-management',
+    title: 'Time Management for College Students',
+    description: 'Master your schedule and balance academics with life',
+    keywords: [
+      'Time management tips for college students',
+      'How to balance college life',
+      'Study schedule planning',
+      'College productivity hacks',
+      'Managing assignments and deadlines',
+    ],
+    color: 'teal',
+  },
 ];
 

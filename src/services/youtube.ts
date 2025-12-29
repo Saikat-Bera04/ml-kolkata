@@ -18,7 +18,6 @@ function parseYouTubeError(body: unknown): { reason?: string; message?: string }
     return {};
   }
 }
-      let errBody: unknown;
 // Cache configuration
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const CACHE_KEY_PREFIX = 'youtube_videos_cache_';
@@ -42,19 +41,19 @@ function getCachedVideos(query: string, maxResults: number, allowExpired: boolea
 
     const data: CachedVideoData = JSON.parse(cached);
     const now = Date.now();
-    
+
     // Check if cache is still valid
     if (now - data.timestamp < CACHE_DURATION) {
       console.log(`Using cached YouTube videos for: ${query}`);
       return data.videos;
     }
-    
+
     // Cache expired
     if (allowExpired) {
       console.log(`Using expired cached YouTube videos for: ${query}`);
       return data.videos;
     }
-    
+
     // Cache expired and not allowed, remove it
     localStorage.removeItem(cacheKey);
     return null;
@@ -86,7 +85,7 @@ function clearOldCacheEntries(): void {
     const keys = Object.keys(localStorage);
     const now = Date.now();
     let cleared = 0;
-    
+
     keys.forEach(key => {
       if (key.startsWith(CACHE_KEY_PREFIX)) {
         try {
@@ -105,7 +104,7 @@ function clearOldCacheEntries(): void {
         }
       }
     });
-    
+
     if (cleared > 0) {
       console.log(`Cleared ${cleared} old cache entries`);
     }
@@ -152,7 +151,7 @@ export async function searchYouTubeVideos(
 
   // Clean subject name and add educational keywords
   const searchQuery = `${subjectName} lecture tutorial engineering competitive exam`;
-  
+
   // Check cache first
   const cachedVideos = getCachedVideos(searchQuery, maxResults);
   if (cachedVideos) {
@@ -175,24 +174,24 @@ export async function searchYouTubeVideos(
     }
 
     const response = await fetch(url.toString());
-    
+
     if (!response.ok) {
-  // Try to parse JSON error from YouTube to get more details
-  let errBody: unknown;
+      // Try to parse JSON error from YouTube to get more details
+      let errBody: unknown;
       try {
         errBody = await response.json();
       } catch (e) {
         // fallback to text
         const text = await response.text();
         console.error('YouTube API error (non-json):', response.status, text);
-        
+
         // Try to return cached data if available (even if expired)
         const expiredCache = getCachedVideos(searchQuery, maxResults, true);
         if (expiredCache) {
           console.warn('Using expired cache due to API error');
           return expiredCache;
         }
-        
+
         throw new Error(`YouTube API error: ${response.status} - ${text}`);
       }
 
@@ -203,14 +202,14 @@ export async function searchYouTubeVideos(
 
       if (reason === 'quotaExceeded') {
         console.warn('YouTube API quota exceeded. Attempting to use cached data...');
-        
+
         // Try to get any cached data (even expired)
         const expiredCache = getCachedVideos(searchQuery, maxResults, true);
         if (expiredCache && expiredCache.length > 0) {
           console.log('Returning cached videos due to quota exceeded');
           return expiredCache;
         }
-        
+
         // No cache available, return empty with helpful message
         console.error('No cached videos available. YouTube API quota exceeded.');
         return [];
@@ -227,23 +226,23 @@ export async function searchYouTubeVideos(
 
     const data: YouTubeSearchResponse = await response.json();
     const videos = data.items || [];
-    
+
     // Cache the results
     if (videos.length > 0) {
       setCachedVideos(searchQuery, maxResults, videos);
     }
-    
+
     return videos;
   } catch (error) {
     console.error('Error fetching YouTube videos:', error);
-    
+
     // Last resort: try to get any cached data (even expired)
     const cached = getCachedVideos(searchQuery, maxResults, true);
     if (cached) {
       console.warn('Using cached data as fallback');
       return cached;
     }
-    
+
     return [];
   }
 }
@@ -323,15 +322,15 @@ export async function searchVideosForTopic(
 
   // Build optimized search query for weak areas
   let searchQuery = '';
-  
+
   if (subject) {
     searchQuery = `${subject} ${topic} tutorial explanation examples practice problems`;
   } else {
     searchQuery = `${topic} tutorial explanation examples practice problems`;
   }
-  
+
   searchQuery += ' engineering competitive exam preparation';
-  
+
   // Check cache first
   const cachedVideos = getCachedVideos(searchQuery, maxResults);
   if (cachedVideos) {
@@ -351,7 +350,7 @@ export async function searchVideosForTopic(
     url.searchParams.append('videoEmbeddable', 'true');
 
     const response = await fetch(url.toString());
-    
+
     if (!response.ok) {
       let errBody: unknown;
       try {
@@ -359,7 +358,7 @@ export async function searchVideosForTopic(
       } catch (e) {
         const errorText = await response.text();
         console.error('YouTube API error:', response.status, errorText);
-        
+
         // Try expired cache
         const expiredCache = getCachedVideos(searchQuery, maxResults, true);
         if (expiredCache) {
@@ -391,7 +390,7 @@ export async function searchVideosForTopic(
 
     const data: YouTubeSearchResponse = await response.json();
     const videos = data.items || [];
-    
+
     if (videos.length === 0) {
       console.warn(`No YouTube videos found for topic: ${topic}${subject ? ` (${subject})` : ''}`);
       return [];
@@ -403,13 +402,13 @@ export async function searchVideosForTopic(
     return videos;
   } catch (error) {
     console.error('Error fetching YouTube videos for topic:', error);
-    
+
     // Try to get cached data
     const cached = getCachedVideos(searchQuery, maxResults);
     if (cached) {
       return cached;
     }
-    
+
     return [];
   }
 }
@@ -431,6 +430,71 @@ export function getEmbedUrl(videoId: string): string {
   return `https://www.youtube.com/embed/${videoId}`;
 }
 
+// Extract video ID from various YouTube URL formats
+export function extractVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/, // Just the video ID itself
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+// Fetch video details by video ID
+export async function getVideoById(videoId: string): Promise<YouTubeVideo | null> {
+  if (!YOUTUBE_API_KEY) {
+    console.warn('YouTube API key is not configured. Please set VITE_YOUTUBE_API_KEY in your .env file.');
+    return null;
+  }
+
+  try {
+    const url = new URL('https://www.googleapis.com/youtube/v3/videos');
+    url.searchParams.append('part', 'snippet');
+    url.searchParams.append('id', videoId);
+    url.searchParams.append('key', YOUTUBE_API_KEY);
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      console.error('YouTube API error fetching video:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) {
+      console.warn('Video not found:', videoId);
+      return null;
+    }
+
+    const item = data.items[0];
+    // Convert to YouTubeVideo format
+    const video: YouTubeVideo = {
+      id: { videoId: item.id },
+      snippet: {
+        title: item.snippet.title,
+        description: item.snippet.description,
+        channelTitle: item.snippet.channelTitle,
+        thumbnails: {
+          medium: { url: item.snippet.thumbnails?.medium?.url || '' },
+          high: { url: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '' },
+        },
+      },
+    };
+
+    return video;
+  } catch (error) {
+    console.error('Error fetching video by ID:', error);
+    return null;
+  }
+}
+
 // Search YouTube videos for competitive exam preparation
 export async function searchCompetitiveExamVideos(
   searchKeywords: string[],
@@ -443,7 +507,7 @@ export async function searchCompetitiveExamVideos(
 
   // Combine keywords and add exam preparation context
   const searchQuery = searchKeywords.join(' ') + ' preparation exam';
-  
+
   // Check cache first
   const cachedVideos = getCachedVideos(searchQuery, maxResults);
   if (cachedVideos) {
@@ -462,7 +526,7 @@ export async function searchCompetitiveExamVideos(
     url.searchParams.append('safeSearch', 'strict');
 
     const response = await fetch(url.toString());
-    
+
     if (!response.ok) {
       let errBody: unknown;
       try {
@@ -470,7 +534,7 @@ export async function searchCompetitiveExamVideos(
       } catch (e) {
         const errorText = await response.text();
         console.error('YouTube API error:', response.status, errorText);
-        
+
         // Try expired cache
         const expiredCache = getCachedVideos(searchQuery, maxResults, true);
         if (expiredCache) {
@@ -490,34 +554,34 @@ export async function searchCompetitiveExamVideos(
         }
         return [];
       }
-      
+
       // Try expired cache for other errors
       const expiredCache = getCachedVideos(searchQuery, maxResults);
       if (expiredCache) {
         return expiredCache;
       }
-      
+
       return [];
     }
 
     const data: YouTubeSearchResponse = await response.json();
     const videos = data.items || [];
-    
+
     // Cache the results
     if (videos.length > 0) {
       setCachedVideos(searchQuery, maxResults, videos);
     }
-    
+
     return videos;
   } catch (error) {
     console.error('Error fetching competitive exam videos:', error);
-    
+
     // Try to get cached data
     const cached = getCachedVideos(searchQuery, maxResults);
     if (cached) {
       return cached;
     }
-    
+
     return [];
   }
 }

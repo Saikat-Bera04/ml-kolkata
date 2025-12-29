@@ -40,6 +40,8 @@ import {
   Circle,
   Loader2,
   ArrowRight,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { QuickActions } from '@/components/dashboard/QuickActions';
@@ -61,6 +63,7 @@ export default function StudentDashboard() {
   const [newGoalText, setNewGoalText] = useState('');
   const [isAddingGoal, setIsAddingGoal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [videosExpanded, setVideosExpanded] = useState(false);
 
   useEffect(() => {
     // Load user profile to get name
@@ -359,63 +362,73 @@ export default function StudentDashboard() {
                 {/* Subsection: Watch videos to improve your weak areas */}
                 {recommendedVideos.size > 0 ? (
                   <div className="pt-8 border-t border-primary/5 space-y-6">
-                    <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setVideosExpanded(!videosExpanded)}
+                      className="flex items-center gap-2 w-full text-left hover:opacity-80 transition-opacity"
+                    >
+                      {videosExpanded ? (
+                        <ChevronDown className="h-5 w-5 text-primary" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-primary" />
+                      )}
                       <PlayCircle className="h-6 w-6 text-primary" />
-                      <h3 className="text-xl font-bold italic tracking-tight text-primary">Watch videos to improve your weak areas:</h3>
-                    </div>
+                      <h3 className="text-xl font-bold italic tracking-tight text-primary">Watch videos to improve your weak areas</h3>
+                    </button>
 
-                    <div className="space-y-10">
-                      {Array.from(recommendedVideos.entries()).map(([key, videos]) => {
-                        const [subject, topic] = key.split('::');
-                        return (
-                          <div key={key} className="space-y-4">
-                            <div className="flex items-center gap-3">
-                              <div className="h-6 w-1 bg-destructive rounded-full" />
-                              <h4 className="text-lg font-bold">{topic}</h4>
-                            </div>
-                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                              {videos.slice(0, 3).map((video) => (
-                                <Card key={video.id.videoId} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all group bg-card/50 backdrop-blur-sm">
-                                  <div className="relative aspect-video bg-muted overflow-hidden">
-                                    <img
-                                      src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
-                                      alt={video.snippet.title}
-                                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all opacity-0 group-hover:opacity-100">
-                                      <a
-                                        href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:scale-110 transition-transform"
-                                        onClick={() => {
-                                          recordActivity('video_watched', {
-                                            videoId: video.id.videoId,
-                                            title: video.snippet.title,
-                                            source: 'dashboard_weak_area'
-                                          });
-                                          window.dispatchEvent(new CustomEvent('activity-updated'));
-                                        }}
-                                      >
-                                        <PlayCircle className="h-8 w-8 fill-white" />
-                                      </a>
+                    {videosExpanded && (
+                      <div className="space-y-10 mt-6">
+                        {Array.from(recommendedVideos.entries()).map(([key, videos]) => {
+                          const [subject, topic] = key.split('::');
+                          return (
+                            <div key={key} className="space-y-4">
+                              <div className="flex items-center gap-3">
+                                <div className="h-6 w-1 bg-destructive rounded-full" />
+                                <h4 className="text-lg font-bold">{topic}</h4>
+                              </div>
+                              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {videos.slice(0, 3).map((video) => (
+                                  <Card key={video.id.videoId} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all group bg-card/50 backdrop-blur-sm">
+                                    <div className="relative aspect-video bg-muted overflow-hidden">
+                                      <img
+                                        src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
+                                        alt={video.snippet.title}
+                                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                      />
+                                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all opacity-0 group-hover:opacity-100">
+                                        <a
+                                          href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:scale-110 transition-transform"
+                                          onClick={() => {
+                                            recordActivity('video_watched', {
+                                              videoId: video.id.videoId,
+                                              title: video.snippet.title,
+                                              source: 'dashboard_weak_area'
+                                            });
+                                            window.dispatchEvent(new CustomEvent('activity-updated'));
+                                          }}
+                                        >
+                                          <PlayCircle className="h-8 w-8 fill-white" />
+                                        </a>
+                                      </div>
                                     </div>
-                                  </div>
-                                  <CardContent className="p-4">
-                                    <h5 className="font-bold text-sm mb-1 line-clamp-2 group-hover:text-primary transition-colors">
-                                      {video.snippet.title}
-                                    </h5>
-                                    <p className="text-xs text-muted-foreground">
-                                      {video.snippet.channelTitle}
-                                    </p>
-                                  </CardContent>
-                                </Card>
-                              ))}
+                                    <CardContent className="p-4">
+                                      <h5 className="font-bold text-sm mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+                                        {video.snippet.title}
+                                      </h5>
+                                      <p className="text-xs text-muted-foreground">
+                                        {video.snippet.channelTitle}
+                                      </p>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="pt-8 border-t border-primary/5 text-center py-12">
@@ -466,9 +479,10 @@ export default function StudentDashboard() {
 
           </div>
         </div>
-      </main>
+      </main >
 
-      {showQuiz && <QuizGenerator onClose={() => setShowQuiz(false)} />}
-    </div>
+      {showQuiz && <QuizGenerator onClose={() => setShowQuiz(false)} />
+      }
+    </div >
   );
 }

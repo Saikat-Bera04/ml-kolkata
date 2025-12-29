@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StudentNavbar } from '@/components/StudentNavbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { podcastSections, type PodcastSection } from '@/data/podcasts';
-import { searchYouTubeVideos, type YouTubeVideo } from '@/services/youtube';
-import { Loader2, Play, Headphones } from 'lucide-react';
+import { searchYouTubeVideos, extractVideoId, getVideoById, type YouTubeVideo } from '@/services/youtube';
+import { Loader2, Play, Headphones, Link2, X, Heart, Clock, Trash2 } from 'lucide-react';
 import { PodcastPlayer } from '@/components/PodcastPlayer';
+import { toast } from 'sonner';
+import { getFavorites, removeFavorite, getLastPlayed } from '@/services/podcastStorage';
 
 export default function StudentPodcasts() {
   const [selectedSection, setSelectedSection] = useState<PodcastSection | null>(null);
@@ -14,6 +17,18 @@ export default function StudentPodcasts() {
   const [loading, setLoading] = useState(false);
   const [currentEpisode, setCurrentEpisode] = useState<YouTubeVideo | null>(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const [favorites, setFavorites] = useState(getFavorites());
+  const [lastPlayed, setLastPlayed] = useState(getLastPlayed());
+
+  // Refresh favorites and last played when player closes
+  useEffect(() => {
+    if (!isPlayerOpen) {
+      setFavorites(getFavorites());
+      setLastPlayed(getLastPlayed());
+    }
+  }, [isPlayerOpen]);
 
   const handleSectionSelect = async (section: PodcastSection) => {
     setSelectedSection(section);
@@ -23,10 +38,10 @@ export default function StudentPodcasts() {
     try {
       // Fetch videos for each keyword and combine results
       const allEpisodes: YouTubeVideo[] = [];
-      
+
       // Limit to first 3 keywords to avoid API quota issues
       const keywordsToSearch = section.keywords.slice(0, 3);
-      
+
       for (const keyword of keywordsToSearch) {
         const videos = await searchYouTubeVideos(keyword, 5);
         allEpisodes.push(...videos);
@@ -57,24 +72,53 @@ export default function StudentPodcasts() {
     setCurrentEpisode(null);
   };
 
-  const getColorClasses = (color: string) => {
-    const colorMap: Record<string, string> = {
-      blue: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
-      green: 'bg-green-50 border-green-200 hover:bg-green-100',
-      orange: 'bg-orange-50 border-orange-200 hover:bg-orange-100',
-      brown: 'bg-amber-50 border-amber-200 hover:bg-amber-100',
-      red: 'bg-red-50 border-red-200 hover:bg-red-100',
-      purple: 'bg-purple-50 border-purple-200 hover:bg-purple-100',
-      yellow: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100',
-      black: 'bg-gray-50 border-gray-200 hover:bg-gray-100',
-    };
-    return colorMap[color] || 'bg-gray-50 border-gray-200 hover:bg-gray-100';
+  // Handle pasting a YouTube URL and converting to podcast
+  const handleUrlSubmit = async () => {
+    if (!youtubeUrl.trim()) {
+      toast.error('Please enter a YouTube URL');
+      return;
+    }
+
+    const videoId = extractVideoId(youtubeUrl.trim());
+    if (!videoId) {
+      toast.error('Invalid YouTube URL', {
+        description: 'Please enter a valid YouTube video link',
+      });
+      return;
+    }
+
+    setLoadingUrl(true);
+    try {
+      const video = await getVideoById(videoId);
+      if (video) {
+        setCurrentEpisode(video);
+        setIsPlayerOpen(true);
+        setYoutubeUrl('');
+        toast.success('Playing as podcast!', {
+          description: video.snippet.title.slice(0, 50) + '...',
+        });
+      } else {
+        toast.error('Video not found', {
+          description: 'Could not find a video with that URL',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching video:', error);
+      toast.error('Failed to load video');
+    } finally {
+      setLoadingUrl(false);
+    }
+  };
+
+  // Use consistent blue color scheme for all cards (matching Coding Interview Prep style)
+  const getColorClasses = () => {
+    return 'bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50';
   };
 
   return (
     <div className="min-h-screen bg-background pb-32">
       <StudentNavbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -87,45 +131,191 @@ export default function StudentPodcasts() {
           </p>
         </div>
 
-        {/* Podcast Sections Grid */}
+        {/* Main Content - Only show when no section is selected */}
         {!selectedSection && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {podcastSections.map((section) => (
-              <Card
-                key={section.id}
-                className={`cursor-pointer transition-all ${getColorClasses(section.color)}`}
-                onClick={() => handleSectionSelect(section)}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg">{section.title}</CardTitle>
-                    <Badge variant="outline">{section.id.split('-')[0]}</Badge>
+          <>
+            {/* Continue Listening Section */}
+            {lastPlayed && lastPlayed.progress.currentTime > 0 && (
+              <Card className="mb-6 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    Continue Listening
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={lastPlayed.episode.thumbnail}
+                      alt={lastPlayed.episode.title}
+                      className="w-20 h-12 object-cover rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm line-clamp-1">{lastPlayed.episode.title}</p>
+                      <p className="text-xs text-muted-foreground">{lastPlayed.episode.channelTitle}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-600 rounded-full"
+                            style={{ width: `${Math.round((lastPlayed.progress.currentTime / lastPlayed.progress.duration) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {Math.round((lastPlayed.progress.currentTime / lastPlayed.progress.duration) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        const video = await getVideoById(lastPlayed.episode.videoId);
+                        if (video) {
+                          setCurrentEpisode(video);
+                          setIsPlayerOpen(true);
+                        }
+                      }}
+                    >
+                      <Play className="h-4 w-4 mr-1" />
+                      Resume
+                    </Button>
                   </div>
-                  <CardDescription className="mt-2">
-                    {section.description}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Favorites Section */}
+            {favorites.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-red-500 fill-red-500" />
+                  Favorites
+                </h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {favorites.slice(0, 4).map((fav) => (
+                    <Card key={fav.videoId} className="overflow-hidden group">
+                      <div className="relative aspect-video bg-muted">
+                        <img
+                          src={fav.thumbnail}
+                          alt={fav.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 h-7 w-7 bg-black/50 hover:bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFavorite(fav.videoId);
+                            setFavorites(getFavorites());
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute inset-0 m-auto h-12 w-12 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={async () => {
+                            const video = await getVideoById(fav.videoId);
+                            if (video) {
+                              setCurrentEpisode(video);
+                              setIsPlayerOpen(true);
+                            }
+                          }}
+                        >
+                          <Play className="h-6 w-6" />
+                        </Button>
+                      </div>
+                      <CardContent className="p-3">
+                        <p className="font-medium text-sm line-clamp-2">{fav.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{fav.channelTitle}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Paste YouTube URL Section */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold mb-4">
+                Convert Any YouTube Video to Podcast
+              </h2>
+              <Card className="border-dashed border-2 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
+                <CardHeader className="pb-3">
+                  <CardDescription>
+                    Paste a YouTube link below to listen to it in audio-only format
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {section.keywords.slice(0, 3).map((keyword, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {keyword}
-                      </Badge>
-                    ))}
-                    {section.keywords.length > 3 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{section.keywords.length - 3} more
-                      </Badge>
-                    )}
+                  <div className="flex gap-3">
+                    <div className="relative flex-1">
+                      <Input
+                        placeholder="Paste YouTube URL here (e.g., https://youtube.com/watch?v=...)"
+                        value={youtubeUrl}
+                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
+                        className="pr-10"
+                      />
+                      {youtubeUrl && (
+                        <button
+                          onClick={() => setYoutubeUrl('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <Button
+                      onClick={handleUrlSubmit}
+                      disabled={loadingUrl || !youtubeUrl.trim()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {loadingUrl ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-2" />
+                          Convert & Play
+                        </>
+                      )}
+                    </Button>
                   </div>
-                  {section.channels && section.channels.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Sources: {section.channels.join(', ')}
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Supports: youtube.com, youtu.be, YouTube Shorts
+                  </p>
                 </CardContent>
               </Card>
-            ))}
+            </div>
+          </>
+        )}
+
+        {/* Podcast Sections Grid */}
+        {!selectedSection && (
+          <div className="space-y-4 mb-8">
+            <h2 className="text-2xl font-bold">General Topics</h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {podcastSections.map((section) => (
+                <Card
+                  key={section.id}
+                  className={`cursor-pointer transition-all ${getColorClasses()}`}
+                  onClick={() => handleSectionSelect(section)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-lg">{section.title}</CardTitle>
+                      <Badge variant="outline">{section.id.split('-')[0]}</Badge>
+                    </div>
+                    <CardDescription className="mt-2">
+                      {section.description}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
 
@@ -232,14 +422,14 @@ export default function StudentPodcasts() {
                     <li>• Speed control (0.5x - 2x)</li>
                     <li>• Background playback</li>
                     <li>• Progress tracking</li>
+                    <li>• Favorite episodes</li>
+                    <li>• Continue listening</li>
                   </ul>
                 </div>
                 <div>
                   <h4 className="font-semibold mb-2">Coming Soon:</h4>
                   <ul className="space-y-1 text-muted-foreground">
                     <li>• Offline downloads</li>
-                    <li>• Favorite episodes</li>
-                    <li>• Continue listening</li>
                     <li>• Playlist creation</li>
                   </ul>
                 </div>
