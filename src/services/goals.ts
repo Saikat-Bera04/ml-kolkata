@@ -47,19 +47,23 @@ function getTodayDayName(): DayOfWeek {
   return dayNames[new Date().getDay()];
 }
 
-// Add a new goal and create corresponding timetable session
+// Add a new goal and create corresponding timetable session if sync is enabled
 export async function addGoal(text: string, userId?: string, date?: string, startTime?: string, endTime?: string): Promise<Goal> {
   const goals = getGoals(date);
-  
+
   // Default to entire day if no time specified
   const start = startTime || '00:00';
   const end = endTime || '23:59';
   const day = getTodayDayName();
-  
+
   let timetableSessionId: string | undefined;
-  
-  // Create timetable session if userId is provided
-  if (userId) {
+
+  // Check if sync is enabled before creating timetable session
+  const { getSyncEnabled } = await import('./syncSettings');
+  const syncEnabled = getSyncEnabled();
+
+  // Create timetable session if userId is provided AND sync is enabled
+  if (userId && syncEnabled) {
     try {
       const session = await createTimetableSession(userId, {
         subject: text.trim(),
@@ -68,7 +72,7 @@ export async function addGoal(text: string, userId?: string, date?: string, star
         end_time: end,
         priority: 'Medium',
       });
-      
+
       if (session && session.id) {
         timetableSessionId = session.id;
       }
@@ -77,7 +81,7 @@ export async function addGoal(text: string, userId?: string, date?: string, star
       // Continue even if timetable creation fails
     }
   }
-  
+
   const newGoal: Goal = {
     id: crypto.randomUUID(),
     text: text.trim(),
@@ -87,26 +91,26 @@ export async function addGoal(text: string, userId?: string, date?: string, star
     startTime: start,
     endTime: end,
   };
-  
+
   goals.push(newGoal);
   const key = getStorageKey(date);
   localStorage.setItem(key, JSON.stringify(goals));
-  
+
   return newGoal;
 }
 
 // Create a goal from a timetable session
 export function createGoalFromSession(session: TimetableSession, date?: string): Goal {
   const goals = getGoals(date);
-  
+
   // Check if goal already exists for this session
   const existingGoal = goals.find(g => g.timetableSessionId === session.id);
   if (existingGoal) {
     return existingGoal;
   }
-  
+
   const goalText = session.topic ? `${session.subject} - ${session.topic}` : session.subject;
-  
+
   const newGoal: Goal = {
     id: crypto.randomUUID(),
     text: goalText,
@@ -116,11 +120,11 @@ export function createGoalFromSession(session: TimetableSession, date?: string):
     startTime: session.start_time,
     endTime: session.end_time,
   };
-  
+
   goals.push(newGoal);
   const key = getStorageKey(date);
   localStorage.setItem(key, JSON.stringify(goals));
-  
+
   return newGoal;
 }
 
@@ -128,13 +132,13 @@ export function createGoalFromSession(session: TimetableSession, date?: string):
 export async function toggleGoal(goalId: string, date?: string): Promise<boolean> {
   const goals = getGoals(date);
   const goal = goals.find(g => g.id === goalId);
-  
+
   if (!goal) return false;
-  
+
   goal.completed = !goal.completed;
   if (goal.completed) {
     goal.completedAt = new Date().toISOString();
-    
+
     // Mark timetable session as completed if linked
     if (goal.timetableSessionId) {
       try {
@@ -146,7 +150,7 @@ export async function toggleGoal(goalId: string, date?: string): Promise<boolean
     }
   } else {
     delete goal.completedAt;
-    
+
     // Unmark timetable session completion if linked
     if (goal.timetableSessionId) {
       try {
@@ -158,10 +162,10 @@ export async function toggleGoal(goalId: string, date?: string): Promise<boolean
       }
     }
   }
-  
+
   const key = getStorageKey(date);
   localStorage.setItem(key, JSON.stringify(goals));
-  
+
   return goal.completed;
 }
 
@@ -169,9 +173,9 @@ export async function toggleGoal(goalId: string, date?: string): Promise<boolean
 export async function deleteGoal(goalId: string, date?: string, deleteTimetableSession: boolean = false): Promise<boolean> {
   const goals = getGoals(date);
   const goal = goals.find(g => g.id === goalId);
-  
+
   if (!goal) return false;
-  
+
   // Delete timetable session if requested
   if (deleteTimetableSession && goal.timetableSessionId) {
     try {
@@ -181,11 +185,11 @@ export async function deleteGoal(goalId: string, date?: string, deleteTimetableS
       console.error('Error deleting timetable session:', error);
     }
   }
-  
+
   const filtered = goals.filter(g => g.id !== goalId);
   const key = getStorageKey(date);
   localStorage.setItem(key, JSON.stringify(filtered));
-  
+
   return true;
 }
 
@@ -199,13 +203,13 @@ export function getGoalBySessionId(sessionId: string, date?: string): Goal | nul
 export function updateGoal(goalId: string, newText: string, date?: string): boolean {
   const goals = getGoals(date);
   const goal = goals.find(g => g.id === goalId);
-  
+
   if (!goal) return false;
-  
+
   goal.text = newText.trim();
   const key = getStorageKey(date);
   localStorage.setItem(key, JSON.stringify(goals));
-  
+
   return true;
 }
 
@@ -213,7 +217,7 @@ export function updateGoal(goalId: string, newText: string, date?: string): bool
 export function getGoalStats(date?: string): { total: number; completed: number; percentage: number } {
   const goals = getGoals(date);
   const completed = goals.filter(g => g.completed).length;
-  
+
   return {
     total: goals.length,
     completed,

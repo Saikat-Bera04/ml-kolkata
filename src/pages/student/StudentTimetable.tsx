@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  getTimetableSessions, 
-  createTimetableSession, 
-  updateTimetableSession, 
+import {
+  getTimetableSessions,
+  createTimetableSession,
+  updateTimetableSession,
   deleteTimetableSession,
   getUpcomingSessions,
   getSessionStatus,
@@ -17,8 +17,8 @@ import {
   type SessionStatus,
 } from '@/services/timetable';
 import { recordActivity } from '@/services/activityTracker';
-import { 
-  notifyTimetableEvent, 
+import {
+  notifyTimetableEvent,
   notifyReminder,
   notifyDailySummary,
   createNotification,
@@ -26,12 +26,12 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { SessionForm } from '@/components/SessionForm';
 import { toast } from 'sonner';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Calendar, 
-  Clock, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Calendar,
+  Clock,
   BookOpen,
   AlertCircle,
   CheckCircle2,
@@ -42,6 +42,9 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { getSyncEnabled, setSyncEnabled } from '@/services/syncSettings';
 
 export default function StudentTimetable() {
   const { user } = useAuth();
@@ -55,9 +58,10 @@ export default function StudentTimetable() {
   const [view, setView] = useState<'weekly' | 'daily'>('weekly');
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>('Monday');
   const [sessionStatuses, setSessionStatuses] = useState<Map<string, SessionStatus>>(new Map());
+  const [syncEnabled, setSyncEnabledState] = useState(getSyncEnabled());
 
   const daysOfWeek: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const timeSlots = Array.from({ length: 18 }, (_, i) => i + 6); // 6 AM to 11 PM
+  const timeSlots = Array.from({ length: 24 }, (_, i) => i); // 12 AM to 11 PM (full 24 hours)
 
   useEffect(() => {
     if (user) {
@@ -104,15 +108,15 @@ export default function StudentTimetable() {
 
   const loadSessions = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const allSessions = await getTimetableSessions(user.id);
       setSessions(allSessions);
-      
+
       const upcoming = await getUpcomingSessions(user.id);
       setUpcomingSessions(upcoming.slice(0, 5)); // Top 5 only
-      
+
       updateSessionStatuses();
     } catch (error) {
       console.error('Error loading sessions:', error);
@@ -197,13 +201,13 @@ export default function StudentTimetable() {
 
   const checkDailySummary = async () => {
     if (!user) return;
-    
+
     const today = new Date();
     const dayNames: DayOfWeek[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayDay = dayNames[today.getDay()];
-    
+
     const todaySessions = sessions.filter(s => s.day === todayDay);
-    
+
     const lastSummary = localStorage.getItem(`daily_summary_${user.id}_${today.toDateString()}`);
     if (!lastSummary && todaySessions.length > 0) {
       await notifyDailySummary(user.id, todaySessions);
@@ -218,13 +222,13 @@ export default function StudentTimetable() {
       const session = await createTimetableSession(user.id, sessionData);
       if (session && session.id) {
         console.log('Session created successfully:', session);
-        
-        // Create goal from this session if it's for today
+
+        // Create goal from this session if it's for today AND sync is enabled
         const now = new Date();
         const dayNames: DayOfWeek[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const todayDay = dayNames[now.getDay()];
-        
-        if (session.day === todayDay) {
+
+        if (session.day === todayDay && syncEnabled) {
           try {
             const { createGoalFromSession } = await import('@/services/goals');
             createGoalFromSession(session);
@@ -234,7 +238,7 @@ export default function StudentTimetable() {
             console.error('Error creating goal from session:', error);
           }
         }
-        
+
         // Immediately update state for instant UI feedback - this ensures the session appears right away
         setSessions(prev => {
           // Check if session already exists (avoid duplicates)
@@ -242,10 +246,10 @@ export default function StudentTimetable() {
             return prev;
           }
           const updated = [...prev, session];
-          
+
           // Also update upcoming sessions immediately
           const tomorrowDay = dayNames[(now.getDay() + 1) % 7];
-          
+
           const upcoming = updated
             .filter(s => {
               // Include today's future sessions and tomorrow's sessions
@@ -260,23 +264,23 @@ export default function StudentTimetable() {
             .sort((a, b) => a.start_time.localeCompare(b.start_time))
             .slice(0, 5);
           setUpcomingSessions(upcoming);
-          
+
           return updated;
         });
-      
+
         // Toast notification
         toast.success('Session Added', {
           description: `New study session: ${session.subject} at ${formatTime(session.start_time)}`,
         });
-        
+
         // Notification center
         await notifyTimetableEvent(user.id, 'created', session);
-        
+
         // Trigger real-time update event
         window.dispatchEvent(new CustomEvent('timetable-updated'));
-        
+
         setFormOpen(false);
-        
+
         // Reload from database after a delay to ensure consistency (but don't block UI)
         setTimeout(async () => {
           const refreshed = await getTimetableSessions(user.id);
@@ -320,26 +324,26 @@ export default function StudentTimetable() {
         setUpcomingSessions(upcoming);
         return updatedSessions;
       });
-      
+
       // Update session statuses
       updateSessionStatuses();
-      
+
       // Toast notification
       toast.success('Session Updated', {
         description: `Your ${updated.subject} session has been updated`,
       });
-      
+
       // Notification center
       await notifyTimetableEvent(user.id, 'updated', updated);
-      
+
       // Trigger real-time update event
       window.dispatchEvent(new CustomEvent('timetable-updated'));
-      
+
       // Reload from database after a short delay to ensure consistency
       setTimeout(async () => {
         await loadSessions();
       }, 500);
-      
+
       setEditingSession(null);
       setFormOpen(false);
     } else {
@@ -384,26 +388,26 @@ export default function StudentTimetable() {
         setUpcomingSessions(upcoming);
         return updated;
       });
-      
+
       // Update session statuses
       updateSessionStatuses();
-      
+
       // Toast notification
       toast.success('Session Deleted', {
         description: `Study session "${sessionSubject}" has been removed`,
       });
-      
+
       // Notification center
       await notifyTimetableEvent(user.id, 'deleted', deletingSession);
-      
+
       // Trigger real-time update event
       window.dispatchEvent(new CustomEvent('timetable-updated'));
-      
+
       // Reload from database after a short delay to ensure consistency
       setTimeout(async () => {
         await loadSessions();
       }, 500);
-      
+
       setDeletingSession(null);
     } else {
       toast.error('Failed to delete session', {
@@ -414,14 +418,14 @@ export default function StudentTimetable() {
 
   const handleCompleteSession = async (session: TimetableSession) => {
     if (!session.id) return;
-    
+
     const success = await markSessionCompleted(session.id);
-    
+
     // Record activity
-    recordActivity('timetable_session_completed', { 
-      subject: session.subject, 
+    recordActivity('timetable_session_completed', {
+      subject: session.subject,
       topic: session.topic,
-      sessionId: session.id 
+      sessionId: session.id
     });
     window.dispatchEvent(new CustomEvent('activity-updated'));
     if (success) {
@@ -436,13 +440,13 @@ export default function StudentTimetable() {
       } catch (error) {
         console.error('Error updating goal completion:', error);
       }
-      
+
       await loadSessions();
-      
+
       toast.success('Session Completed!', {
         description: `Great job completing your ${session.subject} session!`,
       });
-      
+
       if (user) {
         await createNotification(user.id, {
           type: 'timetable',
@@ -451,7 +455,7 @@ export default function StudentTimetable() {
           metadata: { sessionId: session.id, event: 'completed' },
         });
       }
-      
+
       window.dispatchEvent(new CustomEvent('timetable-updated'));
     }
   };
@@ -473,17 +477,17 @@ export default function StudentTimetable() {
   const getTimeSlotPosition = (startTime: string, endTime: string): { top: number; height: number } => {
     const [startHour, startMin] = startTime.split(':').map(Number);
     const [endHour, endMin] = endTime.split(':').map(Number);
-    
+
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
-    
-    const dayStart = 6 * 60; // 6 AM
-    const dayEnd = 23 * 60; // 11 PM
+
+    const dayStart = 0; // 12 AM (midnight)
+    const dayEnd = 24 * 60; // 12 AM next day (full 24 hours)
     const dayDuration = dayEnd - dayStart;
-    
+
     const top = ((startMinutes - dayStart) / dayDuration) * 100;
     const height = ((endMinutes - startMinutes) / dayDuration) * 100;
-    
+
     return { top: Math.max(0, top), height: Math.max(2, height) };
   };
 
@@ -518,29 +522,38 @@ export default function StudentTimetable() {
     const position = getTimeSlotPosition(session.start_time, session.end_time);
     const isActive = status === 'active';
     const isCompleted = status === 'completed';
+    const sessionColor = session.color || '#3B82F6';
 
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`absolute left-0 right-0 rounded-md p-2 text-xs cursor-pointer transition-all hover:shadow-lg ${
-                isActive ? 'ring-2 ring-green-500 ring-offset-2 z-10' : ''
-              } ${isCompleted ? 'opacity-60' : ''}`}
+              className={`absolute left-1 right-1 rounded-lg cursor-pointer transition-all
+                bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
+                hover:shadow-md hover:scale-[1.02] overflow-hidden
+                ${isActive ? 'ring-2 ring-green-500 ring-offset-1 z-10 shadow-md' : 'shadow-sm'}
+                ${isCompleted ? 'opacity-50' : ''}`}
               style={{
                 top: `${position.top}%`,
                 height: `${position.height}%`,
-                backgroundColor: session.color || '#3B82F6',
-                color: 'white',
+                minHeight: '24px',
+                borderLeft: `4px solid ${sessionColor}`,
               }}
               onClick={() => setViewingSession(session)}
             >
-              <div className="font-semibold truncate">{session.subject}</div>
-              {session.topic && (
-                <div className="text-xs opacity-90 truncate">{session.topic}</div>
-              )}
-              <div className="text-xs opacity-75 mt-1">
-                {formatTime(session.start_time)} - {formatTime(session.end_time)}
+              <div className="p-2 h-full flex flex-col">
+                <div className="font-medium text-xs text-gray-900 dark:text-gray-100 truncate">
+                  {session.subject}
+                </div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  {formatTime(session.start_time)} - {formatTime(session.end_time)}
+                </div>
+                {session.topic && position.height > 6 && (
+                  <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">
+                    {session.topic}
+                  </div>
+                )}
               </div>
             </div>
           </TooltipTrigger>
@@ -561,10 +574,9 @@ export default function StudentTimetable() {
     const status = sessionStatuses.get(session.id || '') || getSessionStatus(session);
 
     return (
-      <Card 
-        className={`mb-2 border-l-4 transition-all hover:shadow-lg ${
-          status === 'active' ? 'ring-2 ring-green-500' : ''
-        } ${status === 'completed' ? 'opacity-75' : ''}`}
+      <Card
+        className={`mb-2 border-l-4 transition-all hover:shadow-lg ${status === 'active' ? 'ring-2 ring-green-500' : ''
+          } ${status === 'completed' ? 'opacity-75' : ''}`}
         style={{ borderLeftColor: session.color || '#3B82F6' }}
       >
         <CardContent className={`p-3 ${compact ? 'p-2' : ''}`}>
@@ -582,7 +594,7 @@ export default function StudentTimetable() {
                   <Clock className="h-3 w-3" />
                   {formatTime(session.start_time)} - {formatTime(session.end_time)}
                 </div>
-                <Badge 
+                <Badge
                   variant={session.priority === 'High' ? 'destructive' : session.priority === 'Medium' ? 'default' : 'secondary'}
                   className="text-xs"
                 >
@@ -633,7 +645,7 @@ export default function StudentTimetable() {
   return (
     <div className="min-h-screen bg-background">
       <StudentNavbar />
-      
+
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
@@ -646,16 +658,51 @@ export default function StudentTimetable() {
               Manage your study schedule with real-time updates and smart reminders
             </p>
           </div>
-          <Button 
-            onClick={() => {
-              setEditingSession(null);
-              setFormOpen(true);
-            }}
-            className="shadow-lg"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Session
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="sync-toggle"
+                checked={syncEnabled}
+                onCheckedChange={(checked) => {
+                  setSyncEnabledState(checked);
+                  setSyncEnabled(checked);
+                  toast.success(
+                    checked ? 'Sync enabled' : 'Sync disabled',
+                    {
+                      description: checked
+                        ? 'Timetable and To-Do list will stay in sync'
+                        : 'Timetable and To-Do list are now independent'
+                    }
+                  );
+                }}
+              />
+              <Label htmlFor="sync-toggle" className="cursor-pointer text-sm">
+                Sync with To-Do List
+              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>When enabled, timetable sessions and to-do items stay in sync.</p>
+                    <p className="mt-1 text-xs">• Adding a timetable session for today creates a to-do item</p>
+                    <p className="text-xs">• Adding a to-do item creates a timetable session</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Button
+              onClick={() => {
+                setEditingSession(null);
+                setFormOpen(true);
+              }}
+              className="shadow-lg"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Session
+            </Button>
+          </div>
         </div>
 
         {/* Upcoming Sessions Sidebar */}
@@ -688,30 +735,82 @@ export default function StudentTimetable() {
 
           {/* Weekly View with Time Grid */}
           <TabsContent value="weekly" className="space-y-4">
-            <div className="overflow-x-auto">
-              <div className="grid grid-cols-8 gap-2 min-w-[1200px]">
+            <div className="overflow-x-auto rounded-lg border bg-white dark:bg-gray-900">
+              <div className="flex min-w-[1000px]">
                 {/* Time column */}
-                <div className="sticky left-0 bg-background z-10">
-                  <div className="h-12"></div>
+                <div className="sticky left-0 bg-white dark:bg-gray-900 z-20 border-r w-16">
+                  <div className="h-14 border-b"></div>
                   {timeSlots.map((hour) => (
-                    <div key={hour} className="h-16 border-b text-xs text-muted-foreground p-1">
-                      {hour % 12 || 12}:00 {hour >= 12 ? 'PM' : 'AM'}
+                    <div key={hour} className="h-16 border-b border-gray-100 dark:border-gray-800 flex items-start justify-end pr-2 pt-0">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+                        {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                      </span>
                     </div>
                   ))}
                 </div>
 
                 {/* Day columns */}
-                {daysOfWeek.map((day) => {
+                {daysOfWeek.map((day, index) => {
                   const daySessions = getSessionsForDay(day);
+
+                  // Calculate the date for this day
+                  const today = new Date();
+                  const currentDayIndex = today.getDay();
+                  const dayIndexMap: Record<DayOfWeek, number> = {
+                    'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                    'Thursday': 4, 'Friday': 5, 'Saturday': 6
+                  };
+
+                  const targetDayIndex = dayIndexMap[day];
+                  let daysToAdd = targetDayIndex - currentDayIndex;
+                  if (daysToAdd < 0) daysToAdd += 7;
+
+                  const dayDate = new Date(today);
+                  dayDate.setDate(today.getDate() + daysToAdd);
+
+                  const dateNum = dayDate.getDate();
+                  const isToday = daysToAdd === 0;
+
+                  // Calculate current time position for the red line indicator
+                  const now = new Date();
+                  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                  const timelinePosition = (currentMinutes / (24 * 60)) * 100;
+
                   return (
-                    <div key={day} className="relative min-h-[1152px] border rounded-lg bg-muted/20">
-                      <div className="sticky top-0 bg-background z-10 p-2 border-b">
-                        <div className="font-semibold text-sm">{day.substring(0, 3)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {daySessions.length} session{daySessions.length !== 1 ? 's' : ''}
-                        </div>
+                    <div key={day} className={`relative flex-1 border-r border-gray-100 dark:border-gray-800 ${isToday ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}>
+                      {/* Day header */}
+                      <div className={`h-14 border-b border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center sticky top-0 z-10 ${isToday ? 'bg-blue-50 dark:bg-blue-950/40' : 'bg-white dark:bg-gray-900'}`}>
+                        <span className={`text-xs font-medium uppercase tracking-wide ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                          {day.substring(0, 3)}
+                        </span>
+                        <span className={`text-xl font-semibold ${isToday ? 'bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center' : 'text-gray-700 dark:text-gray-200'}`}>
+                          {dateNum}
+                        </span>
                       </div>
-                      <div className="relative h-full">
+
+                      {/* Time grid with sessions */}
+                      <div className="relative" style={{ height: '1536px' }}>
+                        {/* Hour grid lines */}
+                        {timeSlots.map((hour) => (
+                          <div
+                            key={hour}
+                            className="absolute w-full h-16 border-b border-gray-100 dark:border-gray-800"
+                            style={{ top: `${(hour / 24) * 100}%` }}
+                          />
+                        ))}
+
+                        {/* Current time indicator (red line) - only show on today */}
+                        {isToday && (
+                          <div
+                            className="absolute left-0 right-0 z-10 flex items-center pointer-events-none"
+                            style={{ top: `${timelinePosition}%` }}
+                          >
+                            <div className="w-2.5 h-2.5 rounded-full bg-red-500 -ml-1"></div>
+                            <div className="flex-1 h-0.5 bg-red-500"></div>
+                          </div>
+                        )}
+
+                        {/* Sessions */}
                         {daySessions.map((session) => (
                           <SessionBlock key={session.id} session={session} day={day} />
                         ))}
@@ -726,21 +825,79 @@ export default function StudentTimetable() {
           {/* Daily View */}
           <TabsContent value="daily" className="space-y-4">
             <div className="flex gap-2 mb-4">
-              {daysOfWeek.map((day) => (
-                <Button
-                  key={day}
-                  variant={selectedDay === day ? 'default' : 'outline'}
-                  onClick={() => setSelectedDay(day)}
-                  className="flex-1"
-                >
-                  {day.substring(0, 3)}
-                </Button>
-              ))}
+              {daysOfWeek.map((day) => {
+                // Calculate the date for this day
+                const today = new Date();
+                const currentDayIndex = today.getDay();
+                const dayIndexMap: Record<DayOfWeek, number> = {
+                  'Sunday': 0,
+                  'Monday': 1,
+                  'Tuesday': 2,
+                  'Wednesday': 3,
+                  'Thursday': 4,
+                  'Friday': 5,
+                  'Saturday': 6
+                };
+
+                const targetDayIndex = dayIndexMap[day];
+                let daysToAdd = targetDayIndex - currentDayIndex;
+
+                if (daysToAdd < 0) {
+                  daysToAdd += 7;
+                }
+
+                const dayDate = new Date(today);
+                dayDate.setDate(today.getDate() + daysToAdd);
+                const dateString = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const isToday = daysToAdd === 0;
+
+                return (
+                  <Button
+                    key={day}
+                    variant={selectedDay === day ? 'default' : 'outline'}
+                    onClick={() => setSelectedDay(day)}
+                    className="flex-1 flex flex-col gap-0.5 h-auto py-2"
+                  >
+                    <span className="text-sm font-semibold">{day.substring(0, 3)}</span>
+                    <span className={`text-xs ${selectedDay === day ? 'opacity-90' : 'text-muted-foreground'} ${isToday ? 'font-medium' : ''}`}>
+                      {dateString}
+                    </span>
+                  </Button>
+                );
+              })}
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>{selectedDay}</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  {selectedDay}
+                  <span className="text-sm font-normal text-muted-foreground">
+                    ({(() => {
+                      const today = new Date();
+                      const currentDayIndex = today.getDay();
+                      const dayIndexMap: Record<DayOfWeek, number> = {
+                        'Sunday': 0,
+                        'Monday': 1,
+                        'Tuesday': 2,
+                        'Wednesday': 3,
+                        'Thursday': 4,
+                        'Friday': 5,
+                        'Saturday': 6
+                      };
+
+                      const targetDayIndex = dayIndexMap[selectedDay];
+                      let daysToAdd = targetDayIndex - currentDayIndex;
+
+                      if (daysToAdd < 0) {
+                        daysToAdd += 7;
+                      }
+
+                      const dayDate = new Date(today);
+                      dayDate.setDate(today.getDate() + daysToAdd);
+                      return dayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                    })()})
+                  </span>
+                </CardTitle>
                 <CardDescription>
                   {getSessionsForDay(selectedDay).length} session{getSessionsForDay(selectedDay).length !== 1 ? 's' : ''} scheduled
                 </CardDescription>
@@ -801,7 +958,7 @@ export default function StudentTimetable() {
                   </div>
                   <div>
                     <h4 className="font-semibold mb-2">Priority</h4>
-                    <Badge 
+                    <Badge
                       variant={viewingSession.priority === 'High' ? 'destructive' : viewingSession.priority === 'Medium' ? 'default' : 'secondary'}
                     >
                       {viewingSession.priority}
