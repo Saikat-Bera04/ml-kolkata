@@ -17,7 +17,7 @@ export default function MentorSignup() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password || !fullName) {
       toast({
         title: 'Error',
@@ -101,8 +101,8 @@ export default function MentorSignup() {
               />
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-primary/90"
               disabled={loading}
             >
@@ -119,11 +119,7 @@ export default function MentorSignup() {
             </p>
           </div>
 
-          <div className="mt-4 text-center">
-            <Link to="/student/signup" className="text-sm text-muted-foreground hover:text-primary">
-              Are you a student? Sign up here
-            </Link>
-          </div>
+
         </div>
       </div>
     </div>

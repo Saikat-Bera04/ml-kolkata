@@ -16,7 +16,7 @@ export default function MentorLogin() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
         title: 'Error',
@@ -79,8 +79,8 @@ export default function MentorLogin() {
               />
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-primary/90"
               disabled={loading}
             >
@@ -97,11 +97,7 @@ export default function MentorLogin() {
             </p>
           </div>
 
-          <div className="mt-4 text-center">
-            <Link to="/student/login" className="text-sm text-muted-foreground hover:text-primary">
-              Are you a student? Login here
-            </Link>
-          </div>
+
         </div>
       </div>
     </div>
