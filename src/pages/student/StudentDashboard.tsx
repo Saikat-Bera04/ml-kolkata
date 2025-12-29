@@ -39,7 +39,12 @@ import {
   CheckCircle2,
   Circle,
   Loader2,
+  ArrowRight,
 } from 'lucide-react';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { GoalList } from '@/components/dashboard/GoalList';
+import { LearningProgress } from '@/components/dashboard/LearningProgress';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -280,420 +285,109 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-12">
       <StudentNavbar />
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Welcome back, {userName}!
-          </h1>
-          <p className="text-muted-foreground">
-            Here's your personalized learning dashboard
-          </p>
-        </div>
+      <main className="container mx-auto px-4 py-8 max-w-7xl">
+        <DashboardHeader
+          userName={userName}
+          streak={streak}
+          xpData={xpData}
+        />
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Learning Progress Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Learning Progress</CardTitle>
-              <CardDescription>Your overall mastery by subject</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {subjectPerformance.length > 0 ? (
-                <div className="space-y-4">
-                  {subjectPerformance.slice(0, 5).map((subject) => (
-                    <div key={subject.subject}>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm font-medium">{subject.subject}</span>
-                        <span className="text-sm text-muted-foreground">{Math.round(subject.accuracy)}%</span>
-                      </div>
-                      <Progress value={subject.accuracy} />
-                    </div>
-                  ))}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Main Content Column */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* Personalized Recommendations Section */}
+            {insights && (
+              <section className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h2 className="text-2xl font-bold tracking-tight">Personalized Recommendations</h2>
+                    <p className="text-sm text-muted-foreground">Tailored based on your recent performance</p>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-sm text-muted-foreground text-center py-4">
-                  Complete quizzes to see your learning progress
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Today's Goals Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Today's Goals</CardTitle>
-              <CardDescription>
-                {todayGoals.filter(g => g.completed).length} of {todayGoals.length} completed
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {todayGoals.length > 0 ? (
-                <ul className="space-y-2">
-                  {todayGoals.map((goal) => (
-                    <li key={goal.id} className="flex items-start gap-2 group">
-                      <button
-                        onClick={() => handleToggleGoal(goal.id)}
-                        className="flex-shrink-0 hover:opacity-80 transition-opacity mt-0.5"
-                        aria-label={goal.completed ? 'Mark as incomplete' : 'Mark as complete'}
-                      >
-                        {goal.completed ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Strong Topics */}
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-green-50/50 to-transparent dark:from-green-950/10">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2 text-green-700 dark:text-green-400">
+                        <Award className="h-4 w-4" />
+                        Your Strengths
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {insights.strengths.length > 0 ? (
+                          insights.strengths.map(s => (
+                            <Badge key={s} variant="secondary" className="bg-green-500/10 text-green-700 dark:text-green-400 border-none">
+                              {s}
+                            </Badge>
+                          ))
                         ) : (
-                          <Circle className="w-5 h-5 text-gray-300" />
-                        )}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <span className={`text-sm block ${goal.completed ? 'line-through text-muted-foreground' : ''}`}>
-                          {goal.text}
-                        </span>
-                        {goal.startTime && goal.endTime && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Clock className="w-3 h-3" />
-                            {goal.startTime === '00:00' && goal.endTime === '23:59'
-                              ? 'All day'
-                              : `${goal.startTime} - ${goal.endTime}`}
-                          </span>
+                          <p className="text-xs text-muted-foreground italic">Keep learning to discover your strengths!</p>
                         )}
                       </div>
-                      <button
-                        onClick={() => handleDeleteGoal(goal.id)}
-                        className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive mt-0.5"
-                        aria-label="Delete goal"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-sm text-muted-foreground text-center py-4">
-                  No goals set for today. Add one below to get started!
-                </div>
-              )}
+                    </CardContent>
+                  </Card>
 
-              {isAddingGoal ? (
-                <form
-                  className="flex gap-2 pt-2 border-t"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleAddGoal();
-                  }}
-                >
-                  <Input
-                    type="text"
-                    placeholder="Enter a new goal..."
-                    value={newGoalText}
-                    onChange={(e) => setNewGoalText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddGoal();
-                      } else if (e.key === 'Escape') {
-                        e.preventDefault();
-                        setIsAddingGoal(false);
-                        setNewGoalText('');
-                      }
-                    }}
-                    autoFocus
-                    className="flex-1"
-                  />
-                  <Button type="submit" size="sm" disabled={!newGoalText.trim()}>
-                    Add
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setIsAddingGoal(false);
-                      setNewGoalText('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </form>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => setIsAddingGoal(true)}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Goal
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Adaptive Learning Insights Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                Adaptive Insights
-              </CardTitle>
-              <CardDescription>AI-powered personalized recommendations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {insights ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-accent/10 rounded-lg">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Target className="h-4 w-4" />
-                      Recommended Difficulty
-                    </p>
-                    <p className="text-sm text-muted-foreground capitalize mt-1">
-                      {insights.recommendedDifficulty} level
-                    </p>
-                  </div>
-                  <div className="p-3 bg-accent/10 rounded-lg">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Zap className="h-4 w-4" />
-                      Learning Pace
-                    </p>
-                    <p className="text-sm text-muted-foreground capitalize mt-1">
-                      {insights.learningPace} pace
-                    </p>
-                  </div>
-                  <div className="p-3 bg-accent/10 rounded-lg">
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Daily Study Goal
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {insights.studyPlan.dailyGoal} minutes
-                    </p>
-                  </div>
-                  {insights.focusAreas.length > 0 && (
-                    <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                      <p className="text-sm font-medium flex items-center gap-2 text-red-700 dark:text-red-400">
+                  {/* Weak Topics */}
+                  <Card className="border-none shadow-sm bg-gradient-to-br from-red-50/50 to-transparent dark:from-red-950/10">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2 text-red-700 dark:text-red-400">
                         <AlertCircle className="h-4 w-4" />
-                        Focus Areas
-                      </p>
-                      <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                        {insights.focusAreas.slice(0, 2).join(', ')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Take a quiz to get personalized insights
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Streak Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Learning Streak</CardTitle>
-              <CardDescription>Keep it up!</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center">
-                <div className="text-5xl font-bold text-primary mb-2">{streak}</div>
-                <p className="text-sm text-muted-foreground">Days in a row</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* XP Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Experience Points</CardTitle>
-              <CardDescription>Level up!</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm">Level {xpData.currentLevel + 1}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {xpData.xp.toLocaleString()} / {(xpData.currentLevel + 1) * 350} XP
-                  </span>
-                </div>
-                <Progress value={(xpData.xpInLevel / 350) * 100} />
-                <p className="text-xs text-muted-foreground">
-                  {xpData.xpNeeded} XP to next level
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>What would you like to do?</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setShowQuiz(true)}
-                  className="p-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
-                >
-                  Take Quiz
-                </button>
-                <button
-                  onClick={() => navigate('/student/learning')}
-                  className="p-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
-                >
-                  Watch Video
-                </button>
-                <button
-                  onClick={() => navigate('/student/study-notes')}
-                  className="p-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
-                >
-                  Study Notes
-                </button>
-                <button
-                  onClick={() => navigate('/student/practice')}
-                  className="p-3 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
-                >
-                  Practice
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Personalized Recommendations Section */}
-        {insights && insights.recommendations.length > 0 && (
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5" />
-                  Personalized Recommendations
-                </CardTitle>
-                <CardDescription>
-                  Hyper-personalized content based on your quiz performance
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {insights.recommendations.slice(0, 4).map((rec, index) => (
-                    <div
-                      key={index}
-                      className={`p-4 rounded-lg border ${rec.priority === 'high'
-                          ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20'
-                          : 'border-border bg-accent/5'
-                        }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {rec.type === 'video' && <Video className="h-4 w-4 text-primary" />}
-                          {rec.type === 'practice' && <Target className="h-4 w-4 text-primary" />}
-                          {rec.type === 'review' && <BookOpen className="h-4 w-4 text-primary" />}
-                          {rec.type === 'study_plan' && <BarChart3 className="h-4 w-4 text-primary" />}
-                          <h4 className="font-semibold text-sm">{rec.title}</h4>
-                        </div>
-                        <Badge
-                          variant={rec.priority === 'high' ? 'destructive' : 'secondary'}
-                          className="text-xs"
-                        >
-                          {rec.priority}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3">{rec.description}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          {rec.subject && (
-                            <span className="flex items-center gap-1">
-                              <BookOpen className="h-3 w-3" />
-                              {rec.subject}
-                            </span>
-                          )}
-                          {rec.estimatedTime && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {rec.estimatedTime}
-                            </span>
-                          )}
-                        </div>
-                        {rec.actionUrl && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigate(rec.actionUrl!)}
-                          >
-                            Start
-                          </Button>
+                        Areas for Improvement
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {insights.focusAreas.length > 0 ? (
+                          insights.focusAreas.map(f => (
+                            <Badge key={f} variant="secondary" className="bg-red-500/10 text-red-700 dark:text-red-400 border-none">
+                              {f}
+                            </Badge>
+                          ))
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">No weak areas identified yet. Great job!</p>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
-        {/* YouTube Video Recommendations Section */}
-        {(recommendedVideos.size > 0 || subjectVideos.size > 0) && (
-          <div className="mt-6 space-y-6">
-            {/* Weak Areas Videos */}
-            {recommendedVideos.size > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PlayCircle className="h-5 w-5" />
-                    Recommended Videos for Weak Areas
-                  </CardTitle>
-                  <CardDescription>
-                    Personalized video suggestions to improve your weak topics
-                    {videoQueueStatus && (
-                      <span className="ml-2 text-xs text-muted-foreground">({videoQueueStatus})</span>
-                    )}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingVideos ? (
-                    <div className="text-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-                      <p className="text-sm text-muted-foreground">{videoQueueStatus || 'Loading recommended videos...'}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Processing one request at a time to save API quota
-                      </p>
+                {/* Subsection: Watch videos to improve your weak areas */}
+                {recommendedVideos.size > 0 ? (
+                  <div className="pt-8 border-t border-primary/5 space-y-6">
+                    <div className="flex items-center gap-2">
+                      <PlayCircle className="h-6 w-6 text-primary" />
+                      <h3 className="text-xl font-bold italic tracking-tight text-primary">Watch videos to improve your weak areas:</h3>
                     </div>
-                  ) : (
-                    <div className="space-y-6">
+
+                    <div className="space-y-10">
                       {Array.from(recommendedVideos.entries()).map(([key, videos]) => {
                         const [subject, topic] = key.split('::');
                         return (
-                          <div key={key} className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <AlertCircle className="h-4 w-4 text-red-500" />
-                              <h4 className="font-semibold">
-                                {topic} ({subject})
-                              </h4>
-                              <Badge variant="destructive" className="text-xs">
-                                Weak Area
-                              </Badge>
+                          <div key={key} className="space-y-4">
+                            <div className="flex items-center gap-3">
+                              <div className="h-6 w-1 bg-destructive rounded-full" />
+                              <h4 className="text-lg font-bold">{topic}</h4>
                             </div>
-                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {videos.map((video) => (
-                                <div
-                                  key={video.id.videoId}
-                                  className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
-                                >
-                                  <div className="relative aspect-video bg-muted">
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                              {videos.slice(0, 3).map((video) => (
+                                <Card key={video.id.videoId} className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all group bg-card/50 backdrop-blur-sm">
+                                  <div className="relative aspect-video bg-muted overflow-hidden">
                                     <img
                                       src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
                                       alt={video.snippet.title}
-                                      className="w-full h-full object-cover"
+                                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
                                     />
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-all opacity-0 group-hover:opacity-100">
                                       <a
                                         href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-white hover:scale-110 transition-transform"
+                                        className="p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:scale-110 transition-transform"
                                         onClick={() => {
                                           recordActivity('video_watched', {
                                             videoId: video.id.videoId,
@@ -703,181 +397,74 @@ export default function StudentDashboard() {
                                           window.dispatchEvent(new CustomEvent('activity-updated'));
                                         }}
                                       >
-                                        <PlayCircle className="h-12 w-12" />
+                                        <PlayCircle className="h-8 w-8 fill-white" />
                                       </a>
                                     </div>
                                   </div>
-                                  <div className="p-3">
-                                    <h5 className="font-medium text-sm line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+                                  <CardContent className="p-4">
+                                    <h5 className="font-bold text-sm mb-1 line-clamp-2 group-hover:text-primary transition-colors">
                                       {video.snippet.title}
                                     </h5>
-                                    <p className="text-xs text-muted-foreground line-clamp-1">
+                                    <p className="text-xs text-muted-foreground">
                                       {video.snippet.channelTitle}
                                     </p>
-                                    <a
-                                      href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-primary hover:underline mt-2 inline-block"
-                                    >
-                                      Watch on YouTube →
-                                    </a>
-                                  </div>
-                                </div>
+                                  </CardContent>
+                                </Card>
                               ))}
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Focus Subjects Videos */}
-            {subjectVideos.size > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Video className="h-5 w-5" />
-                    Recommended Videos for Focus Subjects
-                  </CardTitle>
-                  <CardDescription>
-                    Curated videos for subjects you should focus on based on your study plan
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {Array.from(subjectVideos.entries()).map(([subject, videos]) => (
-                      <div key={subject} className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-primary" />
-                          <h4 className="font-semibold">{subject}</h4>
-                          <Badge variant="secondary" className="text-xs">
-                            Focus Subject
-                          </Badge>
-                        </div>
-                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {videos.map((video) => (
-                            <div
-                              key={video.id.videoId}
-                              className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
-                            >
-                              <div className="relative aspect-video bg-muted">
-                                <img
-                                  src={video.snippet.thumbnails.high?.url || video.snippet.thumbnails.medium.url}
-                                  alt={video.snippet.title}
-                                  className="w-full h-full object-cover"
-                                />
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
-                                  <a
-                                    href={`https://www.youtube.com/watch?v=${video.id.videoId}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-white hover:scale-110 transition-transform"
-                                    onClick={() => {
-                                      recordActivity('video_watched', {
-                                        videoId: video.id.videoId,
-                                        title: video.snippet.title,
-                                        subject: subject,
-                                        source: 'dashboard_focus_subject'
-                                      });
-                                      window.dispatchEvent(new CustomEvent('activity-updated'));
-                                    }}
-                                  >
-                                    <PlayCircle className="h-10 w-10" />
-                                  </a>
-                                </div>
-                              </div>
-                              <div className="p-3">
-                                <h5 className="font-medium text-sm line-clamp-2 mb-1 group-hover:text-primary transition-colors">
-                                  {video.snippet.title}
-                                </h5>
-                                <p className="text-xs text-muted-foreground line-clamp-1">
-                                  {video.snippet.channelTitle}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* Study Plan Card */}
-        {insights && insights.studyPlan.focusSubjects.length > 0 && (
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Your Personalized Study Plan
-                </CardTitle>
-                <CardDescription>
-                  Customized based on your performance analysis
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-accent/10 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-sm">Daily Goal</span>
-                    </div>
-                    <p className="text-2xl font-bold">{insights.studyPlan.dailyGoal}</p>
-                    <p className="text-xs text-muted-foreground">minutes per day</p>
-                  </div>
-                  <div className="p-4 bg-accent/10 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-sm">Weekly Goal</span>
-                    </div>
-                    <p className="text-2xl font-bold">{insights.studyPlan.weeklyGoal}</p>
-                    <p className="text-xs text-muted-foreground">quizzes per week</p>
-                  </div>
-                  <div className="p-4 bg-accent/10 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BookOpen className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-sm">Focus Subjects</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {insights.studyPlan.focusSubjects.map((subject) => (
-                        <Badge key={subject} variant="secondary" className="text-xs">
-                          {subject}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {insights.strengths.length > 0 && (
-                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                    <p className="text-sm font-medium flex items-center gap-2 text-green-700 dark:text-green-400 mb-2">
-                      <Award className="h-4 w-4" />
-                      Your Strengths
+                ) : (
+                  <div className="pt-8 border-t border-primary/5 text-center py-12">
+                    <Video className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-20" />
+                    <h3 className="text-lg font-medium mb-1">Personalized Videos are Coming!</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                      {insights.focusAreas.length > 0
+                        ? "We're matching your weak areas with the best video lessons. They'll appear here shortly!"
+                        : "Take a quiz to unlock personalized video recommendations tailored to your performance."}
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      {insights.strengths.map((strength) => (
-                        <Badge key={strength} variant="outline" className="text-xs border-green-300 dark:border-green-700 text-green-700 dark:text-green-400">
-                          {strength}
-                        </Badge>
-                      ))}
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-6 border-primary/20 hover:bg-primary/5"
+                      onClick={() => setShowQuiz(true)}
+                    >
+                      <Brain className="h-4 w-4 mr-2 text-primary" />
+                      Take Your First Quiz
+                    </Button>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              </section>
+            )}
 
-        {/* Activity Heatmap - Full Width */}
-        <div className="mt-6">
-          <ActivityHeatmap />
+            {/* Activity Heatmap */}
+            <section className="pt-4">
+              <ActivityHeatmap />
+            </section>
+          </div>
+
+          {/* Sidebar Column */}
+          <div className="lg:col-span-4 space-y-8">
+            <QuickActions onTakeQuiz={() => setShowQuiz(true)} />
+
+            <GoalList
+              goals={todayGoals}
+              isAddingGoal={isAddingGoal}
+              newGoalText={newGoalText}
+              onAddGoal={handleAddGoal}
+              onToggleGoal={handleToggleGoal}
+              onDeleteGoal={handleDeleteGoal}
+              onSetNewGoalText={setNewGoalText}
+              onSetIsAddingGoal={setIsAddingGoal}
+            />
+
+            <LearningProgress performance={subjectPerformance} />
+
+
+          </div>
         </div>
       </main>
 

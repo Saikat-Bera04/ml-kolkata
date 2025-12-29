@@ -97,7 +97,7 @@ export interface PerformanceMetrics {
 
 export function getPerformanceMetrics(): PerformanceMetrics {
   const results = getQuizResults();
-  
+
   if (results.length === 0) {
     return {
       totalQuizzes: 0,
@@ -159,7 +159,7 @@ export function getPerformanceMetrics(): PerformanceMetrics {
   const bestSubject = subjects.length > 0
     ? subjects.reduce((best, [subject, accuracy]) => accuracy > best.accuracy ? { subject, accuracy } : best, { subject: 'N/A', accuracy: 0 })
     : { subject: 'N/A', accuracy: 0 };
-  
+
   const weakestSubject = subjects.length > 0
     ? subjects.reduce((weakest, [subject, accuracy]) => accuracy < weakest.accuracy ? { subject, accuracy } : weakest, { subject: 'N/A', accuracy: 100 })
     : { subject: 'N/A', accuracy: 0 };
@@ -213,7 +213,7 @@ export function getSubjectPerformance(): SubjectPerformance[] {
     }
     subjectMap[result.subject].scores.push(result.totalScore);
     subjectMap[result.subject].attempts++;
-    
+
     Object.entries(result.subjectStats).forEach(([subject, stats]) => {
       if (subject === result.subject) {
         subjectMap[subject].correct += stats.correct;
@@ -230,6 +230,46 @@ export function getSubjectPerformance(): SubjectPerformance[] {
   }));
 }
 
+// Helper to get unified topic performance data
+function getTopicPerformances() {
+  const results = getQuizResults();
+  const topicMap: { [key: string]: { subject: string; correct: number; total: number; totalTime: number; originalTopicName: string } } = {};
+
+  results.forEach(result => {
+    Object.entries(result.topicStats).forEach(([topic, stats]) => {
+      // Normalize subject and topic for consistent grouping
+      const normalizedSubject = result.subject.trim();
+      const normalizedTopic = topic.trim().toLowerCase();
+      const key = `${normalizedSubject}::${normalizedTopic}`;
+
+      if (!topicMap[key]) {
+        topicMap[key] = {
+          subject: normalizedSubject,
+          correct: 0,
+          total: 0,
+          totalTime: 0,
+          originalTopicName: topic.trim()
+        };
+      }
+      topicMap[key].correct += stats.correct;
+      topicMap[key].total += stats.total;
+      topicMap[key].totalTime += (stats.avgTime || 0) * stats.total;
+    });
+  });
+
+  return Object.entries(topicMap).map(([key, data]) => {
+    const accuracy = data.total > 0 ? (data.correct / data.total) * 100 : 0;
+    return {
+      topic: data.originalTopicName,
+      subject: data.subject,
+      accuracy,
+      averageTime: data.total > 0 ? data.totalTime / data.total : 0,
+      totalAttempts: data.total,
+      correctAttempts: data.correct,
+    };
+  });
+}
+
 // Get weak areas (topics with <60% accuracy)
 export interface WeakArea {
   topic: string;
@@ -241,35 +281,8 @@ export interface WeakArea {
 }
 
 export function getWeakAreas(): WeakArea[] {
-  const results = getQuizResults();
-  const topicMap: { [key: string]: { subject: string; correct: number; total: number; totalTime: number } } = {};
-
-  results.forEach(result => {
-    Object.entries(result.topicStats).forEach(([topic, stats]) => {
-      const key = `${result.subject}::${topic}`;
-      if (!topicMap[key]) {
-        topicMap[key] = { subject: result.subject, correct: 0, total: 0, totalTime: 0 };
-      }
-      topicMap[key].correct += stats.correct;
-      topicMap[key].total += stats.total;
-      topicMap[key].totalTime += stats.avgTime * stats.total;
-    });
-  });
-
-  return Object.entries(topicMap)
-    .map(([key, data]) => {
-      const [subject, topic] = key.split('::');
-      const accuracy = data.total > 0 ? (data.correct / data.total) * 100 : 0;
-      return {
-        topic,
-        subject,
-        accuracy,
-        averageTime: data.total > 0 ? data.totalTime / data.total : 0,
-        totalAttempts: data.total,
-        correctAttempts: data.correct,
-      };
-    })
-    .filter(area => area.accuracy < 60 && area.totalAttempts >= 2) // At least 2 attempts
+  return getTopicPerformances()
+    .filter(area => area.accuracy < 60 && area.totalAttempts >= 1) // At least 1 attempt
     .sort((a, b) => a.accuracy - b.accuracy);
 }
 
@@ -283,34 +296,8 @@ export interface StrongArea {
 }
 
 export function getStrongAreas(): StrongArea[] {
-  const results = getQuizResults();
-  const topicMap: { [key: string]: { subject: string; correct: number; total: number; totalTime: number } } = {};
-
-  results.forEach(result => {
-    Object.entries(result.topicStats).forEach(([topic, stats]) => {
-      const key = `${result.subject}::${topic}`;
-      if (!topicMap[key]) {
-        topicMap[key] = { subject: result.subject, correct: 0, total: 0, totalTime: 0 };
-      }
-      topicMap[key].correct += stats.correct;
-      topicMap[key].total += stats.total;
-      topicMap[key].totalTime += stats.avgTime * stats.total;
-    });
-  });
-
-  return Object.entries(topicMap)
-    .map(([key, data]) => {
-      const [subject, topic] = key.split('::');
-      const accuracy = data.total > 0 ? (data.correct / data.total) * 100 : 0;
-      return {
-        topic,
-        subject,
-        accuracy,
-        averageTime: data.total > 0 ? data.totalTime / data.total : 0,
-        totalAttempts: data.total,
-      };
-    })
-    .filter(area => area.accuracy >= 80 && area.totalAttempts >= 2)
+  return getTopicPerformances()
+    .filter(area => area.accuracy >= 80 && area.totalAttempts >= 1)
     .sort((a, b) => b.accuracy - a.accuracy);
 }
 
@@ -358,7 +345,7 @@ export interface SkillRadarData {
 
 export function getSkillRadarData(): SkillRadarData {
   const results = getQuizResults();
-  
+
   if (results.length === 0) {
     return {
       speed: 0,

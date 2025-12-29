@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getActivityHeatmapData, getActivityStreak, getTotalActivityCount } from '@/services/activityTracker';
-import { Calendar, Flame } from 'lucide-react';
+import { getActivityHeatmapData, getActivityStreak, getLongestActivityStreak, getTotalActivityCount } from '@/services/activityTracker';
+import { Calendar } from 'lucide-react';
 
 interface HeatmapCell {
   date: string;
@@ -13,19 +13,18 @@ interface HeatmapCell {
 export function ActivityHeatmap() {
   const [heatmapData, setHeatmapData] = useState<HeatmapCell[]>([]);
   const [streak, setStreak] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
   useEffect(() => {
     loadHeatmapData();
-    
-    // Listen for activity updates
+
     const handleActivityUpdate = () => {
       loadHeatmapData();
     };
-    
+
     window.addEventListener('activity-updated', handleActivityUpdate);
-    
     return () => {
       window.removeEventListener('activity-updated', handleActivityUpdate);
     };
@@ -34,164 +33,168 @@ export function ActivityHeatmap() {
   const loadHeatmapData = () => {
     const data = getActivityHeatmapData();
     const currentStreak = getActivityStreak();
+    const bestStreak = getLongestActivityStreak();
     const total = getTotalActivityCount();
-    
+
     setHeatmapData(data);
     setStreak(currentStreak);
+    setLongestStreak(bestStreak);
     setTotalCount(total);
   };
 
-  // Group data by weeks (53 weeks for last year) - GitHub style
-  const weeksData = useMemo(() => {
+  const { weeksData, monthLabels } = useMemo(() => {
     const weeks: HeatmapCell[][] = [];
+    const labels: { month: string; index: number }[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Calculate start date (53 weeks ago)
+
     const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - (53 * 7));
+    startDate.setDate(startDate.getDate() - (52 * 7));
     startDate.setHours(0, 0, 0, 0);
-    
-    // Align to Sunday (start of week) - GitHub style
+
     const startDayOfWeek = startDate.getDay();
     const alignedStartDate = new Date(startDate);
     alignedStartDate.setDate(startDate.getDate() - startDayOfWeek);
     alignedStartDate.setHours(0, 0, 0, 0);
-    
-    // Create a map for quick lookup
+
     const dataMap = new Map<string, HeatmapCell>();
     heatmapData.forEach(d => {
       dataMap.set(d.date, d);
     });
-    
-    // Create 53 weeks (columns)
-    for (let week = 0; week < 53; week++) {
+
+    let lastMonth = -1;
+
+    for (let week = 0; week <= 52; week++) {
       const weekData: HeatmapCell[] = [];
-      
-      // For each day of the week (Sunday = 0 to Saturday = 6) - rows
+      const firstDayOfWeek = new Date(alignedStartDate);
+      firstDayOfWeek.setDate(alignedStartDate.getDate() + (week * 7));
+
+      const currentMonth = firstDayOfWeek.getMonth();
+      if (currentMonth !== lastMonth) {
+        labels.push({
+          month: firstDayOfWeek.toLocaleString('default', { month: 'short' }),
+          index: week
+        });
+        lastMonth = currentMonth;
+      }
+
       for (let day = 0; day < 7; day++) {
         const currentDate = new Date(alignedStartDate);
         currentDate.setDate(alignedStartDate.getDate() + (week * 7) + day);
         currentDate.setHours(0, 0, 0, 0);
-        
-        // Only include dates up to today
+
         if (currentDate <= today && currentDate >= alignedStartDate) {
           const dateStr = currentDate.toISOString().split('T')[0];
           const cellData = dataMap.get(dateStr) || { date: dateStr, count: 0, level: 0 };
           weekData.push(cellData);
         } else {
-          // Empty cell for future dates or before start
           weekData.push({ date: '', count: 0, level: 0 });
         }
       }
-      
-      // Only add week if it has at least one valid date
-      if (weekData.some(cell => cell.date)) {
-        weeks.push(weekData);
-      }
+      weeks.push(weekData);
     }
-    
-    return weeks;
+
+    return { weeksData: weeks, monthLabels: labels };
   }, [heatmapData]);
 
-  const getColorForLevel = (level: 0 | 1 | 2 | 3 | 4): string => {
+  const getColorForLevel = (level: number): string => {
     switch (level) {
-      case 0:
-        return 'bg-gray-100 dark:bg-gray-800';
-      case 1:
-        return 'bg-green-200 dark:bg-green-900';
-      case 2:
-        return 'bg-green-400 dark:bg-green-700';
-      case 3:
-        return 'bg-green-600 dark:bg-green-600';
-      case 4:
-        return 'bg-green-800 dark:bg-green-500';
-      default:
-        return 'bg-gray-100 dark:bg-gray-800';
+      case 0: return 'bg-[#ebedf0] dark:bg-[#161b22]'; // GitHub empty
+      case 1: return 'bg-[#9be9a8] dark:bg-[#0e4429]'; // GitHub Level 1
+      case 2: return 'bg-[#40c463] dark:bg-[#006d32]'; // GitHub Level 2
+      case 3: return 'bg-[#30a14e] dark:bg-[#26a641]'; // GitHub Level 3
+      case 4: return 'bg-[#216e39] dark:bg-[#39d353]'; // GitHub Level 4
+      default: return 'bg-[#ebedf0] dark:bg-[#161b22]';
     }
   };
 
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
   };
 
-  const getActivityDescription = (count: number): string => {
-    if (count === 0) return 'No activity';
-    if (count === 1) return '1 activity';
-    return `${count} activities`;
-  };
-
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-none shadow-none bg-transparent">
+      <CardHeader className="px-0 pt-0">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
               Activity Heatmap
             </CardTitle>
             <CardDescription>
-              Your learning activity over the past year
+              {totalCount} activit{totalCount !== 1 ? 'ies' : 'y'} in the last year
             </CardDescription>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-2xl font-bold text-primary">{streak}</div>
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <Flame className="h-3 w-3" />
-                Day streak
-              </div>
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-bold text-primary">{streak} Days</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                Current Streak
+              </span>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-primary">{totalCount}</div>
-              <div className="text-xs text-muted-foreground">Total activities</div>
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-bold text-primary">{longestStreak} Days</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                Longest Streak
+              </span>
             </div>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Heatmap Grid - GitHub Style */}
-          {weeksData.length > 0 ? (
-            <div className="flex gap-1 overflow-x-auto pb-2">
+      <CardContent className="px-0 pb-0 overflow-hidden">
+        <div className="flex flex-col gap-0.5 mt-2">
+          {/* Month Labels */}
+          <div className="flex h-5 text-[10px] text-muted-foreground ml-8">
+            {monthLabels.map((label, i) => (
+              <div
+                key={i}
+                style={{ marginLeft: i === 0 ? `${label.index * 11}px` : `${(label.index - monthLabels[i - 1].index - 1) * 11}px` }}
+                className="flex-none w-8"
+              >
+                {label.month}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            {/* Day Labels */}
+            <div className="flex flex-col gap-[3px] py-1 text-[9px] text-muted-foreground w-6 leading-none">
+              <div className="h-2"></div>
+              <div className="h-2">Mon</div>
+              <div className="h-2"></div>
+              <div className="h-2">Wed</div>
+              <div className="h-2"></div>
+              <div className="h-2">Fri</div>
+              <div className="h-2"></div>
+            </div>
+
+            {/* Heatmap Grid */}
+            <div className="flex gap-[3px]">
               <TooltipProvider>
                 {weeksData.map((week, weekIndex) => (
-                  <div key={weekIndex} className="flex flex-col gap-1">
+                  <div key={weekIndex} className="flex flex-col gap-[3px]">
                     {week.map((cell, dayIndex) => {
-                      if (!cell.date) {
-                        return (
-                          <div
-                            key={`${weekIndex}-${dayIndex}`}
-                            className="w-3 h-3 rounded-sm bg-transparent"
-                          />
-                        );
-                      }
-                      
-                      const isHovered = hoveredCell === cell.date;
-                      
+                      if (!cell.date) return <div key={`${weekIndex}-${dayIndex}`} className="w-2 h-2 rounded-[1px] bg-transparent" />;
+
                       return (
                         <Tooltip key={`${weekIndex}-${dayIndex}`}>
                           <TooltipTrigger asChild>
                             <div
-                              className={`w-3 h-3 rounded-sm cursor-pointer transition-all ${getColorForLevel(cell.level)} ${
-                                isHovered ? 'ring-2 ring-primary ring-offset-1 scale-110' : 'hover:ring-1 hover:ring-primary/50'
-                              }`}
+                              className={`w-2 h-2 rounded-[1px] cursor-pointer transition-colors ${getColorForLevel(cell.level)} shadow-sm`}
                               onMouseEnter={() => setHoveredCell(cell.date)}
                               onMouseLeave={() => setHoveredCell(null)}
                             />
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-sm">
-                              <div className="font-semibold">{getActivityDescription(cell.count)}</div>
-                              <div className="text-muted-foreground">{formatDate(cell.date)}</div>
-                            </div>
+                          <TooltipContent className="p-2 text-[10px]">
+                            <p className="font-bold">{cell.count > 0 ? `${cell.count} activities` : 'No activity'}</p>
+                            <p className="text-muted-foreground">{formatDate(cell.date)}</p>
                           </TooltipContent>
                         </Tooltip>
                       );
@@ -200,35 +203,20 @@ export function ActivityHeatmap() {
                 ))}
               </TooltipProvider>
             </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No activity data yet. Start learning to see your activity heatmap!</p>
-            </div>
-          )}
-
-          {/* Legend */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Less</span>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-gray-100 dark:bg-gray-800" />
-              <div className="w-3 h-3 rounded-sm bg-green-200 dark:bg-green-900" />
-              <div className="w-3 h-3 rounded-sm bg-green-400 dark:bg-green-700" />
-              <div className="w-3 h-3 rounded-sm bg-green-600 dark:bg-green-600" />
-              <div className="w-3 h-3 rounded-sm bg-green-800 dark:bg-green-500" />
-            </div>
-            <span>More</span>
           </div>
+        </div>
 
-          {/* Activity Summary */}
-          <div className="pt-2 border-t">
-            <div className="text-sm text-muted-foreground">
-              {heatmapData.filter(d => d.count > 0).length} days with activity in the last year
-            </div>
+        {/* Legend */}
+        <div className="flex items-center justify-end gap-1.5 mt-4 text-[10px] text-muted-foreground">
+          <span>Less</span>
+          <div className="flex gap-[2px]">
+            {[0, 1, 2, 3, 4].map(l => (
+              <div key={l} className={`w-2 h-2 rounded-[1px] ${getColorForLevel(l)}`} />
+            ))}
           </div>
+          <span>More</span>
         </div>
       </CardContent>
     </Card>
   );
 }
-

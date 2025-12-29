@@ -269,18 +269,17 @@ export default function StudentLearning() {
         <Card>
           <CardContent className="py-12 text-center">
             <Play className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <p className="text-muted-foreground mb-2">
-              No videos found for this subject.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Please check your YouTube API key or try again later.
+            <p className="text-muted-foreground mb-4">
+              {import.meta.env.VITE_YOUTUBE_API_KEY
+                ? "We couldn't find any videos for this subject. This might be due to a daily quota limit on the YouTube API."
+                : "YouTube API key is missing. Please check your .env configuration."}
             </p>
             <Button
               variant="outline"
-              className="mt-4"
+              className="mt-2"
               onClick={() => selectedSubject && handleSubjectSelect(selectedSubject)}
             >
-              Retry
+              Retry Search
             </Button>
           </CardContent>
         </Card>

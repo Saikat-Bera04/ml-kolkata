@@ -1,8 +1,9 @@
 // Personalized Recommendations Service with ML-like Adaptive Learning
 
-import { 
-  getQuizResults, 
-  getWeakAreas, 
+import {
+  getQuizResults,
+  getWeakAreas,
+  getStrongAreas,
   getPerformanceMetrics,
   getSubjectPerformance,
   type WeakArea,
@@ -55,20 +56,19 @@ export function analyzeLearnerPerformance(): AdaptiveLearningInsights {
 
   // Calculate recommended difficulty based on performance
   const recommendedDifficulty = calculateRecommendedDifficulty(metrics);
-  
+
   // Calculate learning pace based on time efficiency and consistency
   const learningPace = calculateLearningPace(results, metrics);
-  
+
   // Identify focus areas (weak topics that need attention)
   const focusAreas = weakAreas
     .slice(0, 5)
     .map(area => `${area.topic} (${area.subject})`);
-  
+
   // Identify strengths (topics with >80% accuracy)
-  const strengths = subjectPerformance
-    .filter(subj => subj.accuracy >= 80)
-    .slice(0, 3)
-    .map(subj => subj.subject);
+  const strengths = getStrongAreas()
+    .slice(0, 5)
+    .map(area => `${area.topic} (${area.subject})`);
 
   // Generate study plan
   const studyPlan = generateStudyPlan(metrics, weakAreas, subjectPerformance);
@@ -264,17 +264,17 @@ export async function getRecommendedVideos(
   const topWeakAreas = weakAreas
     .sort((a, b) => a.accuracy - b.accuracy) // Sort by accuracy (lowest first)
     .slice(0, Math.min(5, weakAreas.length)); // Get top 5 weakest areas
-  
+
   console.log(`[Recommendations] Fetching videos for ${topWeakAreas.length} weak areas using queue...`);
-  
+
   // Queue all requests - they will be processed one at a time
   const videoPromises = topWeakAreas.map(async (area) => {
     try {
       const key = `${area.subject}::${area.topic}`;
-      
+
       // Use queue to ensure only one API call at a time
       const videos = await queueTopicVideos(area.topic, area.subject, 3);
-      
+
       if (videos.length > 0) {
         videoMap.set(key, videos);
         console.log(`[Recommendations] Fetched ${videos.length} videos for ${area.topic}`);
@@ -313,7 +313,7 @@ export async function getSubjectRecommendedVideos(
     try {
       // Use queue to ensure only one API call at a time
       const videos = await queueSubjectVideos(subject, maxVideosPerSubject);
-      
+
       if (videos.length > 0) {
         videoMap.set(subject, videos);
         console.log(`[Recommendations] Fetched ${videos.length} videos for ${subject}`);
