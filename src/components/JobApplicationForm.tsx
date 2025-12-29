@@ -19,10 +19,10 @@ export interface JobApplicationData {
   currentLocation: string;
   dateOfBirth?: string;
   gender?: string;
-  
+
   // Professional Summary
   summary: string;
-  
+
   // Experience
   experience: Array<{
     title: string;
@@ -32,7 +32,7 @@ export interface JobApplicationData {
     current: boolean;
     description: string;
   }>;
-  
+
   // Education
   education: Array<{
     degree: string;
@@ -42,17 +42,17 @@ export interface JobApplicationData {
     endYear: string;
     percentage?: string;
   }>;
-  
+
   // Skills
   skills: string[];
-  
+
   // Certifications
   certifications: Array<{
     name: string;
     issuer: string;
     date: string;
   }>;
-  
+
   // Additional Information
   languages: string[];
   availability: string;
@@ -248,6 +248,10 @@ export function JobApplicationForm({ onSubmit, loading = false }: JobApplication
       alert('Please fill in required fields: Name, Email, and Phone');
       return;
     }
+    if (!formData.resumeFile) {
+      alert('Please upload a resume to proceed');
+      return;
+    }
     onSubmit(formData);
   };
 
@@ -346,7 +350,7 @@ export function JobApplicationForm({ onSubmit, loading = false }: JobApplication
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="resume-upload">Upload Resume</Label>
+            <Label htmlFor="resume-upload">Upload Resume *</Label>
             <div className="flex items-center gap-4">
               <Input
                 id="resume-upload"
@@ -372,16 +376,6 @@ export function JobApplicationForm({ onSubmit, loading = false }: JobApplication
                 </Badge>
               )}
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="resume-text">Or Paste Resume Text</Label>
-            <Textarea
-              id="resume-text"
-              value={formData.resumeText}
-              onChange={(e) => handleInputChange('resumeText', e.target.value)}
-              placeholder="Paste your resume content here..."
-              rows={6}
-            />
           </div>
         </CardContent>
       </Card>

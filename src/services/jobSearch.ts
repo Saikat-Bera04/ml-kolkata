@@ -35,11 +35,11 @@ export async function searchJobs(params: JobSearchParams, startIndex: number = 1
   try {
     // Build structured query for OpenRouter
     let query = `${params.field} jobs in ${params.location}`;
-    
+
     if (params.jobType && params.jobType !== '') {
       query += ` for ${params.jobType}`;
     }
-    
+
     if (params.workType && params.workType !== '') {
       query += ` ${params.workType}`;
     }
@@ -113,7 +113,7 @@ Return the JSON response now:`;
       }));
 
       console.log(`[JobSearch] Found ${mappedJobs.length} jobs for query: ${query}`);
-      
+
       return {
         jobs: mappedJobs,
         totalResults: mappedJobs.length,
@@ -138,7 +138,7 @@ Return the JSON response now:`;
           snippet: `Looking for ${params.field} in ${params.location}. Apply now!`,
         }
       ];
-      
+
       return {
         jobs: defaultJobs,
         totalResults: defaultJobs.length,
@@ -160,7 +160,7 @@ export function extractCompanyName(job: JobResult): string {
   if (job.company) {
     return job.company;
   }
-  
+
   // Fallback to extracting from displayLink or link
   if (job.displayLink) {
     const domain = job.displayLink;
@@ -172,7 +172,7 @@ export function extractCompanyName(job: JobResult): string {
       .split('.')[0];
     return company.charAt(0).toUpperCase() + company.slice(1);
   }
-  
+
   if (job.link) {
     try {
       const url = new URL(job.link);
@@ -188,7 +188,7 @@ export function extractCompanyName(job: JobResult): string {
       return 'Company';
     }
   }
-  
+
   return 'Company';
 }
 
@@ -207,10 +207,10 @@ export function extractWorkType(job: JobResult, params: JobSearchParams): string
   if (job.work_type) {
     return job.work_type;
   }
-  
+
   // Fallback to extracting from text
   const text = ((job.title || '') + ' ' + (job.snippet || '') + ' ' + (job.description || '')).toLowerCase();
-  
+
   if (text.includes('remote') || text.includes('work from home')) {
     return 'Remote';
   }

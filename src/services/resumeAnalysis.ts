@@ -1,6 +1,6 @@
 // Resume Analysis Service using Gemini API for job recommendations
 
-import { generateGeminiText } from './gemini';
+import { generateGeminiText, extractTextFromPDF } from './gemini';
 import { searchJobs, type JobResult } from './jobSearch';
 
 export interface ResumeData {
@@ -80,7 +80,7 @@ Return ONLY the JSON object:`;
 
   try {
     const response = await generateGeminiText(prompt);
-    
+
     // Clean response (remove markdown code blocks if any)
     let cleanedResponse = response.trim();
     if (cleanedResponse.startsWith('```json')) {
@@ -88,7 +88,7 @@ Return ONLY the JSON object:`;
     } else if (cleanedResponse.startsWith('```')) {
       cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
     }
-    
+
     const resumeData: ResumeData = JSON.parse(cleanedResponse);
     return resumeData;
   } catch (error) {
@@ -109,7 +109,7 @@ export async function getJobRecommendations(
   const skills = resumeData.skills?.join(' ') || '';
   const experience = resumeData.experience?.[0]?.title || resumeData.experience?.[0]?.company || '';
   const searchQuery = `${experience} ${skills}`.trim() || 'software developer';
-  
+
   // Search for jobs
   const searchLocation = location || resumeData.location || 'India';
   const jobSearchParams = {
@@ -119,23 +119,23 @@ export async function getJobRecommendations(
     experienceLevel: '',
     workType: '',
   };
-  
+
   console.log('[ResumeAnalysis] Searching for jobs with params:', jobSearchParams);
-  
+
   try {
     const { jobs } = await searchJobs(jobSearchParams, 1);
-    
+
     console.log(`[ResumeAnalysis] Found ${jobs.length} jobs, analyzing matches...`);
-    
+
     if (jobs.length === 0) {
       console.warn('[ResumeAnalysis] No jobs found, returning empty recommendations');
       return [];
     }
-    
+
     // Analyze each job and calculate match score (limit to avoid too many API calls)
     const recommendations: JobRecommendation[] = [];
     const jobsToAnalyze = jobs.slice(0, Math.min(maxJobs, jobs.length));
-    
+
     // Process jobs in batches to avoid overwhelming the API
     for (let i = 0; i < jobsToAnalyze.length; i++) {
       const job = jobsToAnalyze[i];
@@ -143,7 +143,7 @@ export async function getJobRecommendations(
         const match = await calculateJobMatch(resumeData, job);
         recommendations.push(match);
         console.log(`[ResumeAnalysis] Analyzed job ${i + 1}/${jobsToAnalyze.length}: ${job.title} - Match: ${match.matchScore}%`);
-        
+
         // Small delay to avoid rate limiting
         if (i < jobsToAnalyze.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -160,10 +160,10 @@ export async function getJobRecommendations(
         });
       }
     }
-    
+
     // Sort by match score (highest first)
     recommendations.sort((a, b) => b.matchScore - a.matchScore);
-    
+
     console.log(`[ResumeAnalysis] Returning ${recommendations.length} job recommendations`);
     return recommendations.slice(0, maxJobs);
   } catch (error) {
@@ -180,7 +180,7 @@ async function calculateJobMatch(resumeData: ResumeData, job: JobResult): Promis
   const resumeSkills = resumeData.skills?.join(', ') || 'Not specified';
   const resumeExperience = resumeData.experience?.map(exp => `${exp.title} at ${exp.company}`).join('; ') || 'Not specified';
   const jobDescription = job.description || job.snippet || '';
-  
+
   const prompt = `Analyze how well this resume matches the job posting. Return ONLY valid JSON.
 
 Resume Skills: ${resumeSkills}
@@ -201,7 +201,7 @@ Return ONLY the JSON object:`;
 
   try {
     const response = await generateGeminiText(prompt);
-    
+
     // Clean response
     let cleanedResponse = response.trim();
     if (cleanedResponse.startsWith('```json')) {
@@ -209,9 +209,9 @@ Return ONLY the JSON object:`;
     } else if (cleanedResponse.startsWith('```')) {
       cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
     }
-    
+
     const matchData = JSON.parse(cleanedResponse);
-    
+
     return {
       job,
       matchScore: matchData.matchScore || 0,
@@ -240,29 +240,40 @@ export async function analyzeResumeAndGetJobs(
   resumeText: string,
   userLocation?: string
 ): Promise<ResumeAnalysisResult> {
-  const finalResumeText = resumeText || '';
+  let finalResumeText = resumeText || '';
 
-    // OCR / PDF text extraction has been removed. If the user uploaded a file but didn't paste text,
-    // we treat the upload as successful but do not attempt to extract text. Return a lightweight
-    // success response informing the user that the PDF was uploaded successfully.
-    if (!finalResumeText.trim() && resumeFile) {
+  // Extract text from PDF if available
+  if (resumeFile) {
+    try {
+      console.log('Attempting to extract text from PDF...');
+      const pdfText = await extractTextFromPDF(resumeFile);
+      if (pdfText && pdfText.trim().length > 0) {
+        finalResumeText += `\n\n=== CONTENT EXTRACTED FROM RESUME PDF ===\n${pdfText}`;
+        console.log('Successfully extracted text from PDF');
+      }
+    } catch (error) {
+      console.error('Failed to extract text from PDF:', error);
+      // Continue with just the structured data
+    }
+  }
+
+  if (!finalResumeText.trim()) {
+    if (resumeFile) {
       return {
         resumeData: {} as ResumeData,
-        summary: 'Resume uploaded successfully. Text extraction is disabled.',
+        summary: 'Resume uploaded but text extraction failed and no manual details provided.',
         strengths: [],
         improvements: [],
-        suggestions: ['Resume uploaded successfully. To analyze the resume, paste the resume text into the form.'],
+        suggestions: ['Please fill in the profile details manually.'],
         jobRecommendations: [],
       };
     }
-
-  if (!finalResumeText.trim()) {
     throw new Error('Please provide resume text or upload a resume file');
   }
-  
+
   // Analyze resume structure
   const resumeData = await analyzeResumeText(finalResumeText);
-  
+
   // Get comprehensive analysis
   const analysisPrompt = `Analyze this resume and provide detailed feedback. Return ONLY valid JSON.
 
@@ -281,7 +292,7 @@ Return ONLY the JSON object:`;
 
   try {
     const analysisResponse = await generateGeminiText(analysisPrompt);
-    
+
     // Clean response
     let cleanedResponse = analysisResponse.trim();
     if (cleanedResponse.startsWith('```json')) {
@@ -289,15 +300,15 @@ Return ONLY the JSON object:`;
     } else if (cleanedResponse.startsWith('```')) {
       cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
     }
-    
+
     const analysis = JSON.parse(cleanedResponse);
-    
+
     // Get job recommendations
     console.log('[ResumeAnalysis] Getting job recommendations...');
     const jobRecommendations = await getJobRecommendations(resumeData, userLocation, 20);
-    
+
     console.log(`[ResumeAnalysis] Analysis complete. Found ${jobRecommendations.length} job recommendations.`);
-    
+
     return {
       resumeData,
       summary: analysis.summary || 'Resume analysis completed',

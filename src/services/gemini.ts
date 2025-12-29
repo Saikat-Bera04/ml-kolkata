@@ -132,7 +132,7 @@ export async function generateGeminiText(prompt: string, retries = 2): Promise<s
       }
 
       const data = await response.json();
-      
+
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       if (!text) {
         console.error('Empty response from Gemini. Full response:', JSON.stringify(data, null, 2));
@@ -144,7 +144,7 @@ export async function generateGeminiText(prompt: string, retries = 2): Promise<s
       if (error instanceof Error && (error.message.includes('quota') || attempt === retries)) {
         throw error;
       }
-      
+
       // For network errors, retry
       if (attempt < retries) {
         const delay = Math.pow(2, attempt) * 1000;
@@ -152,7 +152,7 @@ export async function generateGeminiText(prompt: string, retries = 2): Promise<s
         await sleep(delay);
         continue;
       }
-      
+
       // Final attempt failed
       if (error instanceof Error) {
         throw error;
@@ -175,17 +175,17 @@ export const generateChatGPTText = generateGeminiText;
 function parseGeminiResponse(text: string): ResumeAnalysis {
   // Simple parsing - in production, you'd want more robust parsing
   const lines = text.split('\n').filter(line => line.trim());
-  
+
   const strengths: string[] = [];
   const improvements: string[] = [];
   const suggestions: string[] = [];
   let summary = '';
 
   let currentSection = '';
-  
+
   for (const line of lines) {
     const lowerLine = line.toLowerCase();
-    
+
     if (lowerLine.includes('strength') || lowerLine.includes('strong')) {
       currentSection = 'strengths';
     } else if (lowerLine.includes('improvement') || lowerLine.includes('weakness') || lowerLine.includes('area for')) {
@@ -196,7 +196,7 @@ function parseGeminiResponse(text: string): ResumeAnalysis {
       currentSection = 'summary';
     } else if (line.trim().startsWith('-') || line.trim().startsWith('•') || line.trim().match(/^\d+\./)) {
       const cleanLine = line.replace(/^[-•\d.\s]+/, '').trim();
-      
+
       if (currentSection === 'strengths' && cleanLine) {
         strengths.push(cleanLine);
       } else if (currentSection === 'improvements' && cleanLine) {
@@ -224,50 +224,35 @@ function parseGeminiResponse(text: string): ResumeAnalysis {
   };
 }
 
+import * as pdfjsLib from 'pdfjs-dist';
+
+// ... other imports ...
+
 // Extract text from PDF using PDF.js
-// To use this, install PDF.js: npm install pdfjs-dist
-// Then uncomment and use the code below
 export async function extractTextFromPDF(file: File): Promise<string> {
-  // TODO: Install pdfjs-dist package: npm install pdfjs-dist
-  // Then uncomment the code below:
-  
-  /*
-  import * as pdfjsLib from 'pdfjs-dist';
-  
-  // Set worker path (adjust based on your build setup)
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-  
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = async (e) => {
-      try {
-        const arrayBuffer = e.target?.result as ArrayBuffer;
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        
-        let fullText = '';
-        
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ');
-          fullText += pageText + '\n';
-        }
-        
-        resolve(fullText);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
-  });
-  */
-  
-  // Placeholder for now
-  return Promise.resolve('PDF text extraction requires pdfjs-dist package. Please install it and uncomment the code above.');
+  try {
+    // Set worker path
+    // Using unpkg for the worker script corresponding to the installed version
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n';
+    }
+
+    return fullText;
+  } catch (error) {
+    console.error('Error extracting text from PDF:', error);
+    throw new Error('Failed to extract text from PDF file. Please ensure it is a valid PDF.');
+  }
 }
 

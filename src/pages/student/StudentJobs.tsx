@@ -125,15 +125,11 @@ export default function StudentJobs() {
 
     try {
       // Build resume text from form data
-      let resumeText = '';
+      // Since client-side PDF text extraction is disabled/removed, we construct the text
+      // from the structured form fields to ensure the analysis service has content to work with.
+      let resumeText = data.resumeText || '';
 
-      if (data.resumeText) {
-        resumeText = data.resumeText;
-      } else if (data.resumeFile) {
-        // OCR has been removed: accept the uploaded file and proceed without extracting text
-        resumeText = '';
-      } else {
-        // Build resume text from form data
+      if (!resumeText) {
         resumeText = `
 Name: ${data.fullName}
 Email: ${data.email}
@@ -338,18 +334,28 @@ Languages: ${data.languages.join(', ')}
 
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Job Search & Recommendations</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            {activeTab === 'search' && 'Job Search'}
+            {activeTab === 'saved' && 'Saved Jobs'}
+            {activeTab === 'resume' && 'Resume Analysis'}
+          </h1>
           <p className="text-muted-foreground">
-            {showForm
-              ? 'Fill out your profile to get personalized job recommendations'
-              : 'AI-powered job recommendations based on your resume'
-            }
+            {activeTab === 'search' && 'Find your dream job with our comprehensive search tool'}
+            {activeTab === 'saved' && 'View and manage your saved job opportunities'}
+            {activeTab === 'resume' && (
+              showForm
+                ? 'Fill out your profile to get personalized job recommendations'
+                : 'AI-powered job recommendations based on your resume'
+            )}
           </p>
         </div>
 
+
+
         {/* Show Form - Only when user clicks to show it */}
-        {showForm && !formSubmitted && (
+        {showForm && !formSubmitted && activeTab === 'resume' && (
           <Card className="mb-6">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -375,7 +381,7 @@ Languages: ${data.languages.join(', ')}
         )}
 
         {/* Show Recommendations After Form Submission */}
-        {formSubmitted && analysisResult && (
+        {formSubmitted && analysisResult && activeTab === 'resume' && (
           <div className="space-y-6 mb-6">
             {/* Back Button */}
             <Button
@@ -579,11 +585,7 @@ Languages: ${data.languages.join(', ')}
         )}
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="search">Search Jobs</TabsTrigger>
-            <TabsTrigger value="saved">Saved Jobs ({savedJobs.length})</TabsTrigger>
-            <TabsTrigger value="resume">Resume Analysis</TabsTrigger>
-          </TabsList>
+
 
           {/* Search Tab */}
           <TabsContent value="search" className="space-y-6">
@@ -756,9 +758,8 @@ Languages: ${data.languages.join(', ')}
             )}
           </TabsContent>
 
-          {/* Resume Analysis Tab - Shows form */}
           <TabsContent value="resume" className="space-y-6">
-            {!showForm ? (
+            {!showForm && (
               <Card>
                 <CardContent className="py-12 text-center">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -769,29 +770,6 @@ Languages: ${data.languages.join(', ')}
                     <Upload className="h-4 w-4 mr-2" />
                     Start Application Form
                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Job Application Profile</CardTitle>
-                      <CardDescription>
-                        Complete your profile to get the best job recommendations. All fields are optional except Name, Email, and Phone.
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setShowForm(false)}
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <JobApplicationForm onSubmit={handleFormSubmit} loading={analyzing} />
                 </CardContent>
               </Card>
             )}
