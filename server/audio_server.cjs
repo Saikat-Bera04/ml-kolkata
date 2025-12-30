@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.AUDIO_SERVER_PORT || 3001;
 
 // Path to yt-dlp executable (use local copy in server folder)
-const YTDLP_PATH = path.join(__dirname, 'yt-dlp.exe');
+const YTDLP_PATH = process.env.YTDLP_PATH || path.join(__dirname, 'yt-dlp.exe');
 
 // Enable CORS for frontend
 app.use(cors({
